@@ -1,4 +1,6 @@
 const groqManager = require('../src/services/groqService');
+const geminiPool = require('../src/services/geminiPool');
+const { resolveActions } = require('./actionResolver');
 
 module.exports = async (req, res) => {
   // CORS Headers
@@ -15,39 +17,77 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { message, history } = req.body || {};
+    const { message, history, userNotionToken, userNotionDbId } = req.body || {};
     const formattedHistory = (history && Array.isArray(history) && history.length > 0)
       ? history.map(h => `${h.role === 'user' ? 'Nutzer' : 'Aura'}: "${h.text}"`).join('\n')
       : "Kein vorheriger Verlauf";
 
-    const systemPrompt = `Du bist Aura AI – ein intelligenter, zellbiologischer, metabolischer und persönlicher Begleiter.
-Antworte prägnant, intelligent, direkt und im coolen Jarvis-Stil. Duz den Nutzer immer.
+    const systemPrompt = `Du bist Aura AI – ein intelligenter, zellbiologischer, metabolischer, multimedialer persönlicher Jarvis-Begleiter.
+Antworte immer prägnant, intelligent, direkt und im coolen Jarvis-Stil. Duz den Nutzer immer.
 
-WICHTIGE REGELN:
-1. STUDIEN & QUELLEN: Gib bei allen medizinischen, biochemischen oder Nährstoff-Empfehlungen (z.B. Magnesium, Tinnitus, HWS, Mitochondrien, Saatöle) IMMER konkrete PubMed / DOI Studien-Referenzen mit klickbarem Link an! Format: [Studie: Autoren/Titel (Jahr)](https://pubmed.ncbi.nlm.nih.gov/PMID/ oder https://doi.org/...).
-2. NOTION ONBOARDING: Wenn der Nutzer nach Notion fragt oder etwas speichern will und noch kein Token hinterlegt ist, erkläre ihm in 2 Sätzen, dass er im Profil ('Anmelden/Profil') seinen eigenen Notion-Token hinterlegen kann (Link: https://www.notion.so/profile/integrations), oder dass Aura es im internen Speicher behält!
+WICHTIGE AKTIONSTRIGGER (Schreibe den Tag genau so in deine Antwort):
+1. MUSIK & YOUTUBE:
+   - Wenn der Nutzer Songs/Musik abspielen will (z.B. "play paro by nej", "spiele song...", "/play ..."):
+     [ACTION:OPEN_APP:youtube:Songname oder Künstler]
+   - Wenn der Nutzer Songs zur Playlist hinzufügen will:
+     [ACTION:ADD_SONG_TO_PLAYLIST:Songname:Künstler]
+   - Wenn der Nutzer einen Song aus der Playlist löschen will:
+     [ACTION:DELETE_SONG_FROM_PLAYLIST:Songname]
+2. TERMINE & KALENDER:
+   - Wenn der Nutzer einen Termin eintragen will:
+     [ACTION:CALENDAR:Event YYYY-MM-DD HH:MM]
+3. NOTION & RECOVERY PLÄNE:
+   - Wenn der Nutzer etwas in Notion speichern will:
+     [ACTION:CREATE_NOTION_PAGE:Titel:Inhalt]
+   - Falls kein Notion konfiguriert ist, erkläre ihm in 2 Sätzen, dass er im Profil ('Anmelden/Profil') seinen Token hinterlegen kann (Link: https://www.notion.so/profile/integrations).
+4. STUDIEN & WISSENSCHAFT:
+   - Gib bei allen medizinischen oder biochemischen Empfehlungen (z.B. Magnesium, Tinnitus, HWS, Mitochondrien, Saatöle) IMMER konkrete PubMed / DOI Studien-Referenzen mit klickbarem Link an! Format: [Studie: Autoren/Titel (Jahr)](https://pubmed.ncbi.nlm.nih.gov/PMID/ oder https://doi.org/...).
 
 Gesprächsverlauf:
 ${formattedHistory}`;
 
-    // Cloudflare / Vercel Serverless direct response via Groq Llama 3 / GPT-OSS
-    const reply = await groqManager.chatCompletion([
-      { role: 'system', content: systemPrompt },
-      { role: 'user', content: message || 'Hallo' }
-    ]);
+    let rawReply = '';
+
+    // First try: Gemini Key Pool (Gemini 2.5 Flash Lite)
+    try {
+      const { GoogleGenAI } = require('@google/genai');
+      const apiKey = geminiPool.getCurrentKey();
+      const ai = new GoogleGenAI({ apiKey });
+      const genRes = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents: [
+          { text: systemPrompt },
+          { text: message || 'Hallo' }
+        ]
+      });
+      rawReply = genRes.text || '';
+    } catch (geminiErr) {
+      console.warn("Gemini Pool failed, rotating to Groq:", geminiErr.message);
+      geminiPool.rotateKey();
+      // Second try: Groq multi-key rotation
+      rawReply = await groqManager.chatCompletion([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: message || 'Hallo' }
+      ]);
+    }
+
+    // Resolve multimedia, playlist and calendar actions
+    const resolved = resolveActions(rawReply, userNotionToken, userNotionDbId);
 
     return res.status(200).json({
-      reply: reply || 'Hallo! Ich bin Aura AI.',
-      actionStatus: null,
-      openUrl: null,
+      reply: resolved.reply || 'Hallo! Ich bin Aura AI. Wie kann ich dir helfen?',
+      actionStatus: resolved.actionStatus,
+      openUrl: resolved.openUrl,
       imageUrl: null,
-      playlistSong: null
+      playlistSong: resolved.playlistSong
     });
   } catch (err) {
     console.error("Vercel Chat Error:", err);
     return res.status(200).json({
-      reply: 'Ich bin Aura AI. Mein Cloud-Knoten ist aktiv! Wie kann ich dir bei deiner Ernährung oder deinen Fragen helfen?',
-      actionStatus: null
+      reply: 'Ich bin Aura AI. Wie kann ich dir helfen?',
+      actionStatus: null,
+      openUrl: null,
+      playlistSong: null
     });
   }
 };
