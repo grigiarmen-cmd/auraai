@@ -145,14 +145,7 @@ function searchFoodDatabase(query) {
   );
 }
 
-export {
+module.exports = {
   FOOD_DATABASE,
   searchFoodDatabase
 };
-
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = {
-    FOOD_DATABASE,
-    searchFoodDatabase
-  };
-}
