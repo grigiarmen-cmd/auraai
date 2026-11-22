@@ -146,15 +146,26 @@ export default function App() {
   }, [musicPlaylist]);
 
   const addSongToPlaylist = (title, artist, url) => {
-    const newSong = {
-      id: 'song_' + Date.now(),
-      title: title || 'Song',
-      artist: artist || 'YouTube',
-      url: url || `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`,
-      addedAt: 'Gerade hinzugefügt'
-    };
-    setMusicPlaylist(prev => [newSong, ...prev]);
-    playJarvisChime();
+    setMusicPlaylist(prev => {
+      // Duplikate verhindern (anhand von Titel & Interpret)
+      const cleanTitle = (title || '').trim().toLowerCase();
+      const cleanArtist = (artist || '').trim().toLowerCase();
+      const alreadyExists = prev.some(s => 
+        s.title.toLowerCase().includes(cleanTitle) || 
+        cleanTitle.includes(s.title.toLowerCase())
+      );
+      if (alreadyExists) return prev;
+
+      const newSong = {
+        id: 'song_' + Date.now(),
+        title: title || 'Song',
+        artist: artist || 'YouTube',
+        url: url || `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`,
+        addedAt: 'Gerade hinzugefügt'
+      };
+      playJarvisChime();
+      return [newSong, ...prev];
+    });
   };
 
   const playSong = (song) => {

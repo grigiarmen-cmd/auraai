@@ -14,6 +14,7 @@ const { analyzeMedicalDiagnosis } = require('./src/services/medicalEngine');
 const { calculateDailyCalorieTarget } = require('./src/services/metabolicEngine');
 const { verificationStore, generateVerificationCode, sendVerificationEmail } = require('./src/services/authService');
 const { searchFoodDatabase, calculateRemainingMacros, generateDailyMetabolicSummary } = require('./src/services/foodDatabase');
+const groqManager = require('./src/services/groqService');
 
 const app = express();
 app.use(cors());
@@ -919,18 +920,24 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
         config: image ? {} : { tools: [{ googleSearch: {} }] }
       });
     } catch(errModel) {
-      console.warn("Primary model error, fallback to gemini-3-flash-preview:", errModel.message);
+      console.warn("Primary Gemini error, trying fallback model:", errModel.message);
       try {
         response = await ai.models.generateContent({
           model: 'gemini-3-flash-preview',
           contents: contents
         });
       } catch(errFallback) {
-        console.warn("Fallback model error, pure text:", errFallback.message);
-        response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: contents
-        });
+        console.warn("Gemini limit reached! Switching immediately to Groq Multi-Key Engine:", errFallback.message);
+        try {
+          const groqText = await groqManager.chatCompletion([
+            { role: 'system', content: prompt },
+            { role: 'user', content: message }
+          ]);
+          response = { text: groqText };
+        } catch(errGroq) {
+          console.error("Groq also exhausted:", errGroq.message);
+          response = { text: "Ich bin Aura AI. Wie kann ich dir behilflich sein?" };
+        }
       }
     }
 
