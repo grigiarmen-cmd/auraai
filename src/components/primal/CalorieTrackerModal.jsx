@@ -80,9 +80,9 @@ export default function CalorieTrackerModal({
 
   useEffect(() => {
     try {
-      localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(dailyEntries));
+      localStorage.setItem(`aura_meals_${currentDateKey}`, JSON.stringify(dailyEntries));
     } catch(e) {}
-  }, [dailyEntries, todayKey]);
+  }, [dailyEntries, currentDateKey]);
 
   if (!isOpen) return null;
 
