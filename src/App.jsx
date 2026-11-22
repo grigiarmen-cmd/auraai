@@ -770,73 +770,73 @@ export default function App() {
         {/* Top Header - Clean High-End Aura Look */}
         <header className="h-14 border-b border-[#171920] px-4 flex items-center justify-between z-20 bg-[#0d0e11]/95 backdrop-blur-md">
           {/* Left: App Title & Session Name */}
-          <div className="flex items-center gap-2 text-xs min-w-0 shrink-0">
+          <div className="flex items-center gap-1.5 text-xs min-w-0 shrink">
             {!isHistorySidebarOpen && (
               <button
                 onClick={() => setIsHistorySidebarOpen(true)}
-                className="p-1.5 rounded-lg text-[#717b91] hover:text-white hover:bg-[#171920] mr-1 shrink-0"
+                className="p-1 rounded-lg text-[#717b91] hover:text-white hover:bg-[#171920] shrink-0"
                 title="Sidebar öffnen"
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
             )}
             <span className="text-white font-bold tracking-wider uppercase text-[11px] bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent shrink-0">
-              Aura AI
+              Aura
             </span>
-            <span className="text-[#3b4252]">/</span>
-            <span className="text-[#8c96ac] font-medium truncate text-[11px] max-w-[140px]">
+            <span className="text-[#3b4252] hidden sm:inline">/</span>
+            <span className="text-[#8c96ac] font-medium truncate text-[11px] max-w-[90px] sm:max-w-[140px] hidden sm:inline">
               {currentSession.title || 'Chat'}
             </span>
           </div>
 
-          {/* Right: Clean, Organized Header Actions (NO HORIZONTAL SCROLLBAR) */}
-          <div className="flex items-center gap-2">
+          {/* Right: Clean, Responsive Header Actions (Horizontally Scrollable without ugly scrollbar) */}
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 shrink-0 max-w-[calc(100vw-110px)] sm:max-w-none">
             {/* 1. Nutrition & Primal Action Group */}
-            <div className="flex items-center bg-[#13151b] border border-[#232733] rounded-xl p-1 gap-1 shrink-0">
+            <div className="flex items-center bg-[#13151b] border border-[#232733] rounded-xl p-0.5 gap-0.5 shrink-0">
               <button
                 onClick={() => setIsCalorieTrackerOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-300 hover:bg-rose-500/15 transition-all"
-                title="Yazio-Style Kcal & Makro Tracker"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-rose-300 hover:bg-rose-500/15 transition-all"
+                title="Kalorien & Makro Tracker"
               >
                 <Flame className="w-3.5 h-3.5 text-rose-400" />
-                <span>Tracker</span>
+                <span className="hidden sm:inline">Tracker</span>
               </button>
               <button
                 onClick={() => setIsBarcodeScannerOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-300 hover:bg-amber-500/15 transition-all"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-300 hover:bg-amber-500/15 transition-all"
                 title="Barcode & Toxicity Scanner"
               >
                 <QrCode className="w-3.5 h-3.5 text-amber-400" />
-                <span>Scanner</span>
+                <span className="hidden sm:inline">Scanner</span>
               </button>
               <button
                 onClick={() => setIsMealVisionOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-orange-300 hover:bg-orange-500/15 transition-all"
-                title="Meal Vision (Nährstoffe & Bioverfügbarkeit)"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-orange-300 hover:bg-orange-500/15 transition-all"
+                title="Meal Vision (Foto-Analyse)"
               >
                 <Camera className="w-3.5 h-3.5 text-orange-400" />
-                <span>Meal Vision</span>
+                <span className="hidden md:inline">Vision</span>
               </button>
               <button
                 onClick={() => setIsFarmMapOpen(true)}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-300 hover:bg-emerald-500/15 transition-all"
-                title="Rohmilch & Bio-Läden in der Nähe"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-emerald-300 hover:bg-emerald-500/15 transition-all"
+                title="Rohmilch & Bio-Höfe"
               >
                 <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Hof & Bio</span>
+                <span className="hidden md:inline">Höfe</span>
               </button>
               <button
                 onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold text-indigo-300 hover:bg-indigo-500/15 transition-all"
-                title="Klinisches Profil & E-Mail-PIN"
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-indigo-300 hover:bg-indigo-500/15 transition-all"
+                title="Profil & Cloud Account"
               >
                 <Shield className="w-3.5 h-3.5 text-indigo-400" />
-                <span>{userProfile ? 'Profil' : 'Anmelden'}</span>
+                <span>{userProfile ? 'Profil' : 'Login'}</span>
               </button>
             </div>
 
-            {/* 2. System Tools (Capture / Briefing / Ghostwriter) */}
-            <div className="flex items-center bg-[#13151b] border border-[#232733] rounded-xl p-1 gap-1 shrink-0">
+            {/* 2. System Tools (Desktop Only) */}
+            <div className="hidden sm:flex items-center bg-[#13151b] border border-[#232733] rounded-xl p-0.5 gap-0.5 shrink-0">
               <button
                 onClick={async () => {
                   if (window.require) {
@@ -850,14 +850,14 @@ export default function App() {
                     } catch(e) {}
                   }
                 }}
-                className="p-1.5 rounded-lg text-[#8c96ac] hover:text-cyan-300 hover:bg-[#1c202a] transition-all"
+                className="p-1 rounded-lg text-[#8c96ac] hover:text-cyan-300 hover:bg-[#1c202a] transition-all"
                 title="Capture Screenshot (Ctrl+Shift+S)"
               >
                 <Camera className="w-3.5 h-3.5 text-cyan-400" />
               </button>
               <button
                 onClick={() => handleSend('/briefing')}
-                className="p-1.5 rounded-lg text-[#8c96ac] hover:text-amber-300 hover:bg-[#1c202a] transition-all"
+                className="p-1 rounded-lg text-[#8c96ac] hover:text-amber-300 hover:bg-[#1c202a] transition-all"
                 title="Daily Briefing (Wetter & Termine)"
               >
                 <Sun className="w-3.5 h-3.5 text-amber-400" />
@@ -867,7 +867,7 @@ export default function App() {
                   setGhostWriterOpen(true);
                   setGhostResult('');
                 }}
-                className="p-1.5 rounded-lg text-[#8c96ac] hover:text-purple-300 hover:bg-[#1c202a] transition-all"
+                className="p-1 rounded-lg text-[#8c96ac] hover:text-purple-300 hover:bg-[#1c202a] transition-all"
                 title="Ghostwriter (Ctrl+Alt+G)"
               >
                 <Wand2 className="w-3.5 h-3.5 text-purple-400" />
@@ -880,24 +880,24 @@ export default function App() {
                 setIsMusicSidebarOpen(!isMusicSidebarOpen);
                 if (isNotionSidebarOpen) setIsNotionSidebarOpen(false);
               }}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-medium border transition-all shrink-0 ${
+              className={`flex items-center gap-1 px-2 py-1 rounded-xl text-[11px] font-medium border transition-all shrink-0 ${
                 isMusicSidebarOpen
                   ? 'bg-rose-500/20 border-rose-500/40 text-rose-300'
                   : 'bg-[#13151b] border-[#232733] text-[#8c96ac] hover:text-white hover:bg-[#1c202a]'
               }`}
-              title="Musikliste / Jukebox"
+              title="Musikliste"
             >
               <Music className="w-3.5 h-3.5 text-rose-400" />
-              <span>Musik ({musicPlaylist.length})</span>
+              <span className="hidden sm:inline">Musik</span>
             </button>
 
             {/* 4. Neuer Chat */}
             <button
               onClick={createNewChat}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-bold text-white transition-all shadow-md shadow-blue-500/20 shrink-0"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-blue-600 hover:bg-blue-500 text-[11px] font-bold text-white transition-all shadow-md shadow-blue-500/20 shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Neu</span>
+              <span className="hidden xs:inline">Neu</span>
             </button>
           </div>
         </header>
