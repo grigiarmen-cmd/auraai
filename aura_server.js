@@ -13,6 +13,7 @@ const { fetchOpenFoodFacts, calculateDistanceKm, queryNearbyStores, generateDeep
 const { analyzeMedicalDiagnosis } = require('./src/services/medicalEngine');
 const { calculateDailyCalorieTarget } = require('./src/services/metabolicEngine');
 const { verificationStore, generateVerificationCode, sendVerificationEmail } = require('./src/services/authService');
+const { searchFoodDatabase, calculateRemainingMacros, generateDailyMetabolicSummary } = require('./src/services/foodDatabase');
 
 const app = express();
 app.use(cors());
@@ -1448,6 +1449,29 @@ app.post('/api/auth/verify-code', (req, res) => {
     });
   } catch (err) {
     console.error("Verify Code Error:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Yazio-Style Food Database & Calorie Tracker Routes
+app.get('/api/food/search', (req, res) => {
+  try {
+    const q = req.query.q || '';
+    const results = searchFoodDatabase(q);
+    res.json({ success: true, count: results.length, foods: results });
+  } catch (err) {
+    console.error('Food search error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/food/daily-summary', (req, res) => {
+  try {
+    const { meals, userProfile } = req.body;
+    const summary = generateDailyMetabolicSummary(meals || [], userProfile || {});
+    res.json({ success: true, summary });
+  } catch (err) {
+    console.error('Daily summary error:', err);
     res.status(500).json({ error: err.message });
   }
 });

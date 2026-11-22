@@ -3,7 +3,7 @@ import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
 import { Camera, Upload, Sparkles, AlertTriangle, ShieldCheck, Flame, X, ChevronRight, Check } from 'lucide-react';
 
-export default function MealVisionModal({ isOpen, onClose, onSaveToNotion }) {
+export default function MealVisionModal({ isOpen, onClose, onSaveToNotion, onAddToTracker }) {
   const [selectedImage, setSelectedImage] = useState(null);
   const [userNote, setUserNote] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -266,12 +266,22 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion }) {
               )}
 
               {/* Action Buttons */}
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row gap-2 pt-2">
                 <button
                   onClick={() => { setSelectedImage(null); setAnalysisResult(null); }}
-                  className="flex-1 py-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs transition-colors"
+                  className="py-2.5 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-semibold text-xs transition-colors"
                 >
-                  Neues Foto scannen
+                  Neues Foto
+                </button>
+                <button
+                  onClick={() => {
+                    if (onAddToTracker) {
+                      onAddToTracker(analysisResult);
+                    }
+                  }}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-black font-bold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-orange-500/20"
+                >
+                  <Flame size={15} /> In Kalorien-Tracker loggen
                 </button>
                 <button
                   onClick={() => {
@@ -281,17 +291,10 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion }) {
                     }
                   }}
                   disabled={savedToNotion}
-                  className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-emerald-500/20"
+                  className="py-2.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-900 text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5"
                 >
-                  {savedToNotion ? (
-                    <>
-                      <Check size={16} /> In Notion gespeichert!
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles size={16} /> In Notion Food-Log speichern
-                    </>
-                  )}
+                  {savedToNotion ? <Check size={15} /> : <Sparkles size={15} />}
+                  <span>{savedToNotion ? 'Notion ✓' : 'Notion'}</span>
                 </button>
               </div>
             </div>

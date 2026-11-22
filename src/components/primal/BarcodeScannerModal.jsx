@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
-import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink } from 'lucide-react';
+import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink, Flame, Check } from 'lucide-react';
 
-export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStore }) {
+export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStore, onAddToTracker }) {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [productData, setProductData] = useState(null);
@@ -166,6 +166,28 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                     )}
                     {productData.nutrients?.fat && (
                       <span className="px-2 py-0.5 rounded bg-zinc-800/80 text-amber-300">{productData.nutrients.fat}</span>
+                    )}
+                    {onAddToTracker && (
+                      <button
+                        onClick={() => {
+                          const calMatch = (productData.nutrients?.calories || '').match(/(\d+)/);
+                          const protMatch = (productData.nutrients?.protein || '').match(/(\d+(?:\.\d+)?)/);
+                          const fatMatch = (productData.nutrients?.fat || '').match(/(\d+(?:\.\d+)?)/);
+                          const carbMatch = (productData.nutrients?.carbs || '').match(/(\d+(?:\.\d+)?)/);
+                          onAddToTracker({
+                            name: productData.name,
+                            calories: calMatch ? parseInt(calMatch[1], 10) : 250,
+                            protein: protMatch ? parseFloat(protMatch[1]) : 10,
+                            fat: fatMatch ? parseFloat(fatMatch[1]) : 8,
+                            carbs: carbMatch ? parseFloat(carbMatch[1]) : 20,
+                            isClean: (productData.science?.auraScore || 0) >= 70
+                          });
+                        }}
+                        className="ml-auto px-2.5 py-1 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 text-xs font-bold flex items-center gap-1 transition-all"
+                        title="Zu Kalorien & Makro-Log hinzufügen"
+                      >
+                        <Flame size={12} className="text-orange-400" /> + In Tracker
+                      </button>
                     )}
                   </div>
                 </div>

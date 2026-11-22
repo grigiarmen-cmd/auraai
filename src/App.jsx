@@ -48,13 +48,16 @@ import {
   Pause,
   QrCode,
   Apple,
-  Shield
+  Shield,
+  Flame,
+  Activity
 } from 'lucide-react';
 
 import BarcodeScannerModal from './components/primal/BarcodeScannerModal';
 import MealVisionModal from './components/primal/MealVisionModal';
 import FarmMapModal from './components/primal/FarmMapModal';
 import AuthModal from './components/primal/AuthModal';
+import CalorieTrackerModal from './components/primal/CalorieTrackerModal';
 
 import { getApiBaseUrl } from './services/apiConfig';
 const API_BASE = getApiBaseUrl();
@@ -103,6 +106,7 @@ export default function App() {
   const [isMealVisionOpen, setIsMealVisionOpen] = useState(false);
   const [isFarmMapOpen, setIsFarmMapOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isCalorieTrackerOpen, setIsCalorieTrackerOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const saved = localStorage.getItem('aura_user_profile');
@@ -701,6 +705,14 @@ export default function App() {
             {/* 1. Nutrition & Primal Action Group */}
             <div className="flex items-center bg-[#13151b] border border-[#232733] rounded-xl p-1 gap-1 shrink-0">
               <button
+                onClick={() => setIsCalorieTrackerOpen(true)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-300 hover:bg-rose-500/15 transition-all"
+                title="Yazio-Style Kcal & Makro Tracker"
+              >
+                <Flame className="w-3.5 h-3.5 text-rose-400" />
+                <span>Tracker</span>
+              </button>
+              <button
                 onClick={() => setIsBarcodeScannerOpen(true)}
                 className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-amber-300 hover:bg-amber-500/15 transition-all"
                 title="Barcode & Toxicity Scanner"
@@ -984,6 +996,33 @@ export default function App() {
             {showSlashMenu && (
               <div className="mb-2 p-1.5 bg-[#161922] border border-[#2b3040] rounded-xl shadow-2xl flex flex-col gap-1 w-full max-w-sm">
                 <span className="text-[10px] font-semibold text-[#64748b] px-2 py-0.5 uppercase tracking-wider">Slash Actions</span>
+                <button
+                  type="button"
+                  onClick={() => { setShowSlashMenu(false); setInput(''); setIsCalorieTrackerOpen(true); }}
+                  className="flex items-center gap-2 p-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#202533] hover:text-white transition-colors"
+                >
+                  <Flame className="w-3.5 h-3.5 text-rose-400" />
+                  <span className="font-medium text-white">/tracker</span>
+                  <span className="text-[10px] text-[#64748b]">Yazio Kcal & Makro Tracker öffnen</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSlashMenu(false); setInput(''); setIsBarcodeScannerOpen(true); }}
+                  className="flex items-center gap-2 p-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#202533] hover:text-white transition-colors"
+                >
+                  <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="font-medium text-white">/scanner</span>
+                  <span className="text-[10px] text-[#64748b]">Barcode & Toxizitäts-Scanner</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowSlashMenu(false); setInput(''); setIsMealVisionOpen(true); }}
+                  className="flex items-center gap-2 p-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#202533] hover:text-white transition-colors"
+                >
+                  <Camera className="w-3.5 h-3.5 text-orange-400" />
+                  <span className="font-medium text-white">/meal</span>
+                  <span className="text-[10px] text-[#64748b]">Teller-Foto oder Speisekarte scannen</span>
+                </button>
                 <button
                   type="button"
                   onClick={() => { setInput('/image '); setShowSlashMenu(false); textareaRef.current?.focus(); }}
@@ -1570,12 +1609,37 @@ export default function App() {
       )}
 
       {/* Aura Nutrition & Primal Modals */}
+      <CalorieTrackerModal
+        isOpen={isCalorieTrackerOpen}
+        onClose={() => setIsCalorieTrackerOpen(false)}
+      />
+
       <BarcodeScannerModal
         isOpen={isBarcodeScannerOpen}
         onClose={() => setIsBarcodeScannerOpen(false)}
         onOpenMapWithStore={(storeName) => {
           setIsBarcodeScannerOpen(false);
           setIsFarmMapOpen(true);
+        }}
+        onAddToTracker={(item) => {
+          try {
+            const todayKey = new Date().toISOString().split('T')[0];
+            const saved = localStorage.getItem(`aura_meals_${todayKey}`);
+            const list = saved ? JSON.parse(saved) : [];
+            list.push({
+              id: Date.now().toString(),
+              name: item.name,
+              calories: item.calories,
+              protein: item.protein,
+              fat: item.fat,
+              carbs: item.carbs,
+              isClean: item.isClean !== false,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(list));
+            setIsBarcodeScannerOpen(false);
+            setIsCalorieTrackerOpen(true);
+          } catch(e) {}
         }}
       />
 
@@ -1587,6 +1651,31 @@ export default function App() {
           if (addToNotion) {
             addToNotion(`${mealData.dishName} (${mealData.estimatedMacros?.calories || ''})`, `Aura Score: ${mealData.auraScore}/100 - ${mealData.tier}`);
           }
+        }}
+        onAddToTracker={(mealData) => {
+          try {
+            const calMatch = (mealData.estimatedMacros?.calories || '').match(/(\d+)/);
+            const protMatch = (mealData.estimatedMacros?.protein || '').match(/(\d+(?:\.\d+)?)/);
+            const fatMatch = (mealData.estimatedMacros?.fat || '').match(/(\d+(?:\.\d+)?)/);
+            const carbMatch = (mealData.estimatedMacros?.carbs || '').match(/(\d+(?:\.\d+)?)/);
+            
+            const todayKey = new Date().toISOString().split('T')[0];
+            const saved = localStorage.getItem(`aura_meals_${todayKey}`);
+            const list = saved ? JSON.parse(saved) : [];
+            list.push({
+              id: Date.now().toString(),
+              name: mealData.dishName || 'Mahlzeit',
+              calories: calMatch ? parseInt(calMatch[1], 10) : 550,
+              protein: protMatch ? parseFloat(protMatch[1]) : 30,
+              fat: fatMatch ? parseFloat(fatMatch[1]) : 25,
+              carbs: carbMatch ? parseFloat(carbMatch[1]) : 40,
+              isClean: (mealData.auraScore || 0) >= 70,
+              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(list));
+            setIsMealVisionOpen(false);
+            setIsCalorieTrackerOpen(true);
+          } catch(e) {}
         }}
       />
 
