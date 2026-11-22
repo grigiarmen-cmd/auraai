@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    background-color: #0b0c0e;
+    color: #ffffff;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+  }
+}
+
+/* Uiverse Input Styling & Animated Pop Icon */
+.uiverse-input-container {
+  --icon-size: 26px;
+  position: relative;
+  width: 100%;
+}
+
+.uiverse-input-container svg {
+  position: absolute;
+  width: var(--icon-size);
+  top: 50%;
+  left: 1.25rem;
+  transform: translateY(-50%);
+  overflow: visible;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.3s ease;
+}
+
+.uiverse-input-container:is(:hover, :focus-within) svg {
+  color: #c084fc;
+}
+
+.uiverse-input-container svg path {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.uiverse-input-container:is(:hover, :focus-within) svg path {
+  animation: pop 0.5s var(--d) ease;
+}
+
+.uiverse-input-container svg path:nth-of-type(1) {
+  --d: 0.24s;
+  --r: 20deg;
+  --s: 1.5;
+}
+.uiverse-input-container svg path:nth-of-type(2) {
+  --d: 0.12s;
+  --r: 10deg;
+  --s: 1.4;
+}
+.uiverse-input-container svg path:nth-of-type(3) {
+  --d: 0s;
+  --r: 0deg;
+  --s: 1.25;
+}
+
+@keyframes pop {
+  50% {
+    transform: scale(var(--s, 1)) rotate(var(--r, 0deg));
+  }
+}
+
+.uiverse-search {
+  width: 100%;
+  box-shadow: 0 20px 30px -5px rgba(0, 0, 0, 0.5), 0 10px 15px -6px rgba(0, 0, 0, 0.4);
+  padding: 1.1rem 3.5rem 1.1rem calc(1.25rem + var(--icon-size) + 0.75rem);
+  font-size: 1.05rem;
+  background:
+    linear-gradient(#141518, #141518) padding-box,
+    linear-gradient(120deg, hsl(278, 60%, 65%), hsl(35, 90%, 68%)) border-box;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  outline: none;
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
+
+.uiverse-search:focus {
+  box-shadow: 0 20px 35px -5px rgba(192, 132, 252, 0.25), 0 0 15px rgba(251, 191, 36, 0.15);
+  border-color: transparent;
+}
+
+.uiverse-search::placeholder {
+  color: rgba(255, 255, 255, 0.35);
+}
+
+/* Pulsing Glowing Aura Orb */
+@keyframes orb-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 25px rgba(168, 85, 247, 0.6));
+  }
+  50% {
+    transform: scale(1.06);
+    filter: drop-shadow(0 0 45px rgba(236, 72, 153, 0.8));
+  }
+}
+
+.aura-orb {
+  animation: orb-pulse 4s infinite ease-in-out;
+  border-radius: 50%;
+  background: conic-gradient(from 180deg at 50% 50%, #ec4899 0deg, #8b5cf6 120deg, #38bdf8 240deg, #ec4899 360deg);
+}

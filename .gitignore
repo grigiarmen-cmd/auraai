@@ -1,0 +1,43 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment files with sensitive secrets & API keys
+.env
+.env.local
+.env.production
+*.env
+
+# Build outputs & huge binaries
+dist/
+build/
+release/
+temp_app/
+android/
+aura_template/
+android_build/bin/
+android_build/gen/
+android_build/raw_unsigned.apk
+android_build/raw_unsigned-aligned-signed.apk
+android_build/raw_unsigned-aligned-signed.apk.idsig
+*.idsig
+
+# Scratch & test scripts
+check-*.js
+find-*.js
+inspect-*.js
+list-*.js
+query-*.js
+server.js
+engine.py
+test-*.js
+test_*.js
+test-conn.py
+
+# Temporary / OS
+.DS_Store
+Thumbs.db
+test_tail.txt
+test_head.txt

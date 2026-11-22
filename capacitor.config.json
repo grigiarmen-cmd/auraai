@@ -1,0 +1,9 @@
+{
+  "appId": "com.aura.ai",
+  "appName": "Aura AI",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "cleartext": true
+  }
+}
