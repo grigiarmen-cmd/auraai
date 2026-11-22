@@ -4,7 +4,7 @@ const API_BASE = getApiBaseUrl();
 import { 
   Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Scale, 
   Clock, QrCode, Camera, ShieldCheck, AlertTriangle, ChevronRight, ChevronLeft, Zap, Droplet,
-  ChevronDown, ChevronUp, PieChart, BookOpen, Utensils
+  ChevronDown, ChevronUp, PieChart, BookOpen, Utensils, Mic, MicOff, Edit3, Activity, Heart, Send
 } from 'lucide-react';
 import { getBiochemicalProfile, scaleBiochemicalValues } from '../../services/deepNutritionService';
 
@@ -29,6 +29,18 @@ export default function CalorieTrackerModal({
 
   // Selected Day Offset (0 = Heute, -1 = Gestern, etc.)
   const [dayOffset, setDayOffset] = useState(0);
+
+  // Active View Mode inside Tracker: 'dashboard' | 'foodscan_hub' | 'food_search_modal'
+  const [activeSubView, setActiveSubView] = useState('dashboard');
+
+  // AI FoodScan Interactive State
+  const [aiInputMode, setAiInputMode] = useState('text'); // 'text' | 'voice' | 'photo' | 'barcode'
+  const [aiFoodText, setAiFoodText] = useState('');
+  const [isAiListening, setIsAiListening] = useState(false);
+  const [isAiProcessing, setIsAiProcessing] = useState(false);
+
+  // Food Search Modal Tab: 'kürzlich' | 'gesucht' | 'favoriten'
+  const [searchTab, setSearchTab] = useState('kürzlich');
 
   // Carousel Slide Index for Dashboard Stats (0: Gauge Speedometer, 1: Macro Breakdown, 2: Micronutrients/Electrolytes, 3: Equation Summary)
   const [dashboardSlide, setDashboardSlide] = useState(0);
@@ -990,60 +1002,396 @@ export default function CalorieTrackerModal({
 
         {/* 5. Floating Action Button (FAB) Bottom-Right with Menu */}
         <div className="absolute bottom-5 right-5 z-20 flex flex-col items-end gap-2">
-          {/* Expanded FAB Menu Items */}
+          {/* Expanded FAB Menu Items matching FDDB design */}
           {isFabOpen && (
-            <div className="flex flex-col gap-2 mb-1 animate-in slide-in-from-bottom-3 duration-200">
+            <div className="flex flex-col items-end gap-2 mb-2 animate-in slide-in-from-bottom-4 fade-in duration-200">
+              
+              {/* Körperwerte */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  alert("Körperwerte-Tracking: Gewicht, KFA & Biomarker werden synchronisiert.");
+                }}
+                className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
+              >
+                <Scale size={15} className="text-sky-300" />
+                <span>Körperwerte</span>
+              </button>
+
+              {/* Aktivität */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  alert("Aktivität & Kalorienverbrauch werden erfasst.");
+                }}
+                className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
+              >
+                <Activity size={15} className="text-sky-300" />
+                <span>Aktivität</span>
+              </button>
+
+              {/* Mahlzeit (Tagebucheintrag) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  setActiveSubView('food_search_modal');
+                }}
+                className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
+              >
+                <Utensils size={15} className="text-sky-300" />
+                <span>Mahlzeit</span>
+              </button>
+
+              {/* KI FoodScan */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  setActiveSubView('foodscan_hub');
+                }}
+                className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
+              >
+                <Sparkles size={15} className="text-sky-300" />
+                <span>KI FoodScan</span>
+              </button>
+
+              {/* Suchen */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  setActiveSubView('food_search_modal');
+                }}
+                className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
+              >
+                <Search size={15} className="text-sky-300" />
+                <span>Suchen</span>
+              </button>
+
+              {/* Scannen (Barcode) */}
               <button
                 type="button"
                 onClick={() => {
                   setIsFabOpen(false);
                   if (onOpenBarcodeScanner) onOpenBarcodeScanner();
                 }}
-                className="px-3 py-2 rounded-2xl bg-zinc-900/95 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center gap-2 shadow-xl hover:bg-zinc-800 transition-all"
+                className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
               >
-                <QrCode size={16} className="text-amber-400" />
-                <span>Barcode scannen</span>
+                <QrCode size={15} className="text-sky-300" />
+                <span>Scannen</span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFabOpen(false);
-                  if (onOpenMealVision) onOpenMealVision();
-                }}
-                className="px-3 py-2 rounded-2xl bg-zinc-900/95 border border-orange-500/50 text-orange-300 font-bold text-xs flex items-center gap-2 shadow-xl hover:bg-zinc-800 transition-all"
-              >
-                <Camera size={16} className="text-orange-400" />
-                <span>Foto-Scan (Vision)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setIsFabOpen(false);
-                  const searchEl = document.querySelector("input[placeholder*='Mahlzeit suchen']");
-                  if (searchEl) searchEl.focus();
-                }}
-                className="px-3 py-2 rounded-2xl bg-zinc-900/95 border border-sky-500/50 text-sky-300 font-bold text-xs flex items-center gap-2 shadow-xl hover:bg-zinc-800 transition-all"
-              >
-                <Search size={16} className="text-sky-400" />
-                <span>Mahlzeit suchen</span>
-              </button>
             </div>
           )}
 
-          {/* Main Neon Cyan FAB Button */}
+          {/* Main Neon Cyan FAB Button (Exact round pill button with + / x) */}
           <button
             type="button"
             onClick={() => setIsFabOpen(prev => !prev)}
-            className={`w-13 h-13 rounded-2xl bg-sky-400 hover:bg-sky-300 text-black flex items-center justify-center shadow-lg shadow-sky-500/40 active:scale-90 transition-all ${
+            className={`w-14 h-14 rounded-full bg-[#60a5fa] hover:bg-[#93c5fd] text-[#090b10] flex items-center justify-center shadow-xl shadow-sky-500/30 active:scale-90 transition-all ${
               isFabOpen ? 'rotate-45 bg-zinc-800 text-white border border-zinc-700' : ''
             }`}
-            title="Mahlzeit / Scan hinzufügen"
+            title="Aktion hinzufügen"
           >
-            <Plus size={24} className="stroke-[2.5]" />
+            <Plus size={26} className="stroke-[2.5]" />
           </button>
         </div>
+
+        {/* 6. KI FoodScan SubView Modal (1:1 matching Screenshot 2) */}
+        {activeSubView === 'foodscan_hub' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-[#111319] border border-zinc-800 rounded-3xl p-6 shadow-2xl flex flex-col justify-between min-h-[520px]">
+              
+              {/* Header */}
+              <div>
+                <div className="flex items-center justify-between pb-4 border-b border-zinc-800/60">
+                  <button 
+                    onClick={() => setActiveSubView('dashboard')}
+                    className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800/60"
+                  >
+                    <X size={20} />
+                  </button>
+                  <span className="font-bold text-white text-sm">KI FoodScan</span>
+                  <div className="w-6" />
+                </div>
+
+                {/* Subtitle */}
+                <div className="mt-6 space-y-2">
+                  <h3 className="text-xl font-bold text-white tracking-tight">
+                    Wie möchtest du deine Mahlzeit tracken?
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Beschreibe dein Essen per Text, Sprache oder Scan — unsere Aura KI erkennt Zutaten und Kalorien automatisch.
+                  </p>
+                </div>
+
+                {/* Action Pills matching Screenshot 2 */}
+                <div className="mt-6 flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setAiInputMode('text')}
+                    className={`h-11 px-5 rounded-full font-semibold text-xs flex items-center gap-3 transition-all ${
+                      aiInputMode === 'text'
+                        ? 'bg-[#1e4a7a] text-white shadow-md shadow-sky-500/20 border border-sky-400/30'
+                        : 'bg-[#161a24] text-zinc-300 hover:text-white border border-zinc-800'
+                    }`}
+                  >
+                    <Edit3 size={15} />
+                    <span>Text eingeben</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAiInputMode('voice');
+                      setIsAiListening(!isAiListening);
+                    }}
+                    className={`h-11 px-5 rounded-full font-semibold text-xs flex items-center gap-3 transition-all ${
+                      isAiListening
+                        ? 'bg-rose-600 text-white animate-pulse'
+                        : 'bg-[#1e4a7a] text-white hover:bg-[#255c99]'
+                    }`}
+                  >
+                    <Mic size={15} />
+                    <span>{isAiListening ? 'Ich höre zu... (Tap zum Stoppen)' : 'Spracheingabe machen'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSubView('dashboard');
+                      if (onOpenMealVision) onOpenMealVision();
+                    }}
+                    className="h-11 px-5 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-semibold text-xs flex items-center gap-3 transition-all active:scale-95"
+                  >
+                    <Camera size={15} />
+                    <span>Foto aufnehmen</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSubView('dashboard');
+                      if (onOpenBarcodeScanner) onOpenBarcodeScanner();
+                    }}
+                    className="h-11 px-5 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-semibold text-xs flex items-center gap-3 transition-all active:scale-95"
+                  >
+                    <QrCode size={15} />
+                    <span>Barcode scannen</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Bottom Natural Language Input Box matching Screenshot 2 */}
+              <div className="mt-6 pt-3 border-t border-zinc-800/60">
+                <div className="relative flex items-center bg-[#161a25] border border-zinc-700/60 rounded-2xl px-4 py-3 shadow-inner">
+                  <input
+                    type="text"
+                    placeholder="Beschreibe, was du gegessen hast..."
+                    value={aiFoodText}
+                    onChange={(e) => setAiFoodText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && aiFoodText.trim()) {
+                        handleSearch(aiFoodText);
+                        setActiveSubView('food_search_modal');
+                      }
+                    }}
+                    className="w-full bg-transparent text-xs text-white placeholder-zinc-500 focus:outline-none pr-16"
+                  />
+                  <div className="absolute right-3 flex items-center gap-2 text-zinc-400">
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        setActiveSubView('dashboard');
+                        if (onOpenMealVision) onOpenMealVision();
+                      }}
+                      className="hover:text-white"
+                      title="Foto anfügen"
+                    >
+                      <Camera size={16} />
+                    </button>
+                    <button 
+                      type="button" 
+                      onClick={() => setIsAiListening(!isAiListening)}
+                      className={`hover:text-white ${isAiListening ? 'text-rose-400' : ''}`}
+                      title="Spracheingabe"
+                    >
+                      <Mic size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (aiFoodText.trim()) {
+                          handleSearch(aiFoodText);
+                          setActiveSubView('food_search_modal');
+                        }
+                      }}
+                      className="text-sky-400 hover:text-sky-300"
+                      title="Senden"
+                    >
+                      <Send size={15} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center text-[10px] text-zinc-500 mt-1.5 px-1">
+                  <span>{aiFoodText.length}/500 Zeichen</span>
+                  <span>Aura Deep-Science AI</span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* 7. Tagebucheintrag & Food Search View Modal (1:1 matching Screenshot 3) */}
+        {activeSubView === 'food_search_modal' && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
+            <div className="w-full max-w-md bg-[#111319] border border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col max-h-[92vh]">
+              
+              {/* Header */}
+              <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60">
+                <button 
+                  onClick={() => setActiveSubView('dashboard')}
+                  className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800/60"
+                >
+                  <X size={20} />
+                </button>
+                <span className="font-bold text-white text-sm">Tagebucheintrag</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveSubView('foodscan_hub')}
+                  className="p-1.5 text-zinc-400 hover:text-white rounded-xl hover:bg-zinc-800/60"
+                >
+                  <Plus size={20} />
+                </button>
+              </div>
+
+              {/* Navigation Tabs (Suche, Favoriten, Meine Rezepte, Aktivitäten) */}
+              <div className="flex border-b border-zinc-800/80 gap-4 mt-3 overflow-x-auto text-xs font-semibold no-scrollbar">
+                {['Suche', 'Favoriten', 'Meine Rezepte', 'Aktivitäten', 'Kalorien'].map((tab, idx) => (
+                  <button
+                    key={tab}
+                    className={`pb-2.5 transition-colors whitespace-nowrap ${
+                      idx === 0
+                        ? 'border-b-2 border-sky-400 text-sky-400'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+
+              {/* Search Bar matching Screenshot 3 */}
+              <div className="relative mt-3.5">
+                <Search className="absolute left-3.5 top-3 text-zinc-400" size={16} />
+                <input
+                  type="text"
+                  placeholder="Lebensmittel suchen..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  className="w-full bg-[#181c28] border border-zinc-700/60 rounded-2xl pl-10 pr-16 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-sky-500"
+                />
+                <div className="absolute right-3 top-2.5 flex items-center gap-2 text-zinc-400">
+                  <button 
+                    onClick={() => {
+                      setActiveSubView('dashboard');
+                      if (onOpenBarcodeScanner) onOpenBarcodeScanner();
+                    }}
+                    title="Barcode scannen"
+                    className="hover:text-white"
+                  >
+                    <QrCode size={16} />
+                  </button>
+                  <button 
+                    onClick={() => setActiveSubView('foodscan_hub')}
+                    title="KI Scan"
+                    className="hover:text-sky-400"
+                  >
+                    <Sparkles size={16} className="text-purple-400" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-Tabs: Kürzlich eingetragen | Zuletzt gesucht */}
+              <div className="flex items-center gap-6 mt-4 border-b border-zinc-800/50 pb-2 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setSearchTab('kürzlich')}
+                  className={`transition-colors ${
+                    searchTab === 'kürzlich' ? 'text-white border-b-2 border-sky-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Kürzlich eingetragen
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSearchTab('gesucht')}
+                  className={`transition-colors ${
+                    searchTab === 'gesucht' ? 'text-white border-b-2 border-sky-400 pb-1' : 'text-zinc-500 hover:text-zinc-300'
+                  }`}
+                >
+                  Zuletzt gesucht
+                </button>
+              </div>
+
+              {/* Items List (Live Search Results or Recent Grocery Items matching Screenshot 3) */}
+              <div className="flex-1 overflow-y-auto divide-y divide-zinc-800/40 mt-2 pr-1">
+                {(searchResults.length > 0 ? searchResults : [
+                  { id: 'f1', name: 'Apfel (frisch)', serving: 'mittelgroßer (130 g)', calories: 70, fat: 0, carbs: 19, protein: 0 },
+                  { id: 'f2', name: 'Mango Chunks (Frozen)', serving: '250 g', calories: 165, fat: 1, carbs: 36, protein: 1 },
+                  { id: 'f3', name: 'Banane (frisch)', serving: '100 g', calories: 93, fat: 0, carbs: 20, protein: 1 },
+                  { id: 'f4', name: 'Mandarine (frisch)', serving: '2x mittelgroße (210 g)', calories: 55, fat: 0, carbs: 11, protein: 1 },
+                  { id: 'f5', name: 'Kartoffel (gegart, mit Schale)', serving: '700 g', calories: 455, fat: 1, carbs: 83, protein: 14 },
+                  { id: 'f6', name: 'Prosciutto', serving: '100 g', calories: 234, fat: 14, carbs: 0, protein: 27 },
+                  { id: 'f7', name: 'Honig (Bio-Rohkost)', serving: '50 g', calories: 153, fat: 0, carbs: 38, protein: 0 }
+                ]).map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setActiveSubView('dashboard');
+                      openDetailCalculator(item);
+                    }}
+                    className="py-3 px-1 flex items-center justify-between hover:bg-zinc-800/30 cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-sm font-bold shrink-0">
+                        🍎
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-semibold text-white group-hover:text-sky-300 transition-colors block text-xs truncate">
+                          {item.name}
+                        </span>
+                        <span className="text-[11px] text-zinc-400 block mt-0.5">
+                          {item.serving}
+                        </span>
+                        <span className="text-[10px] text-zinc-500 font-mono block mt-0.5">
+                          {item.calories} kcal - {item.fat} g F, {item.carbs} g KH, {item.protein} g P
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveSubView('dashboard');
+                        openDetailCalculator(item);
+                      }}
+                      className="w-8 h-8 rounded-full bg-[#1e4a7a] group-hover:bg-[#255c99] text-white flex items-center justify-center shrink-0 shadow-md shadow-sky-500/10 transition-transform active:scale-90"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
