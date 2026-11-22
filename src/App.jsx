@@ -58,6 +58,8 @@ import MealVisionModal from './components/primal/MealVisionModal';
 import FarmMapModal from './components/primal/FarmMapModal';
 import AuthModal from './components/primal/AuthModal';
 import CalorieTrackerModal from './components/primal/CalorieTrackerModal';
+import BloodWorkModal from './components/primal/BloodWorkModal';
+import CaffeineCircadianModal from './components/primal/CaffeineCircadianModal';
 
 import { getApiBaseUrl } from './services/apiConfig';
 const API_BASE = getApiBaseUrl();
@@ -107,6 +109,8 @@ export default function App() {
   const [isFarmMapOpen, setIsFarmMapOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isCalorieTrackerOpen, setIsCalorieTrackerOpen] = useState(false);
+  const [isBloodWorkOpen, setIsBloodWorkOpen] = useState(false);
+  const [isCaffeineModalOpen, setIsCaffeineModalOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(() => {
     try {
       const saved = localStorage.getItem('aura_user_profile');
@@ -826,6 +830,22 @@ export default function App() {
                 <span className="hidden md:inline">Höfe</span>
               </button>
               <button
+                onClick={() => setIsBloodWorkOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-rose-400 hover:bg-rose-500/15 transition-all"
+                title="Blutbild & Laborwert-Scanner (OCR)"
+              >
+                <Activity className="w-3.5 h-3.5 text-rose-500" />
+                <span className="hidden md:inline">Labor</span>
+              </button>
+              <button
+                onClick={() => setIsCaffeineModalOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-yellow-300 hover:bg-yellow-500/15 transition-all"
+                title="Circadian & Koffein-Halbwertszeit Tracker"
+              >
+                <Sun className="w-3.5 h-3.5 text-yellow-400" />
+                <span className="hidden md:inline">Koffein</span>
+              </button>
+              <button
                 onClick={() => setIsAuthModalOpen(true)}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-indigo-300 hover:bg-indigo-500/15 transition-all"
                 title="Profil & Cloud Account"
@@ -1385,6 +1405,22 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setIsBloodWorkOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-rose-400 transition-colors"
+          >
+            <Activity className="w-4 h-4 text-rose-400" />
+            <span className="text-[9px] font-medium">Labor</span>
+          </button>
+
+          <button
+            onClick={() => setIsCaffeineModalOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-yellow-400 transition-colors"
+          >
+            <Sun className="w-4 h-4 text-yellow-400" />
+            <span className="text-[9px] font-medium">Koffein</span>
+          </button>
+
+          <button
             onClick={() => setIsAuthModalOpen(true)}
             className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-indigo-400 transition-colors"
           >
@@ -1826,6 +1862,16 @@ export default function App() {
       <FarmMapModal
         isOpen={isFarmMapOpen}
         onClose={() => setIsFarmMapOpen(false)}
+      />
+
+      <BloodWorkModal
+        isOpen={isBloodWorkOpen}
+        onClose={() => setIsBloodWorkOpen(false)}
+      />
+
+      <CaffeineCircadianModal
+        isOpen={isCaffeineModalOpen}
+        onClose={() => setIsCaffeineModalOpen(false)}
       />
 
       <AuthModal
