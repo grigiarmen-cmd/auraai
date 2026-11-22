@@ -553,6 +553,30 @@ export default function App() {
     if (userProfile && userProfile.conditions) {
       enrichedText = `[PATIENTEN-KONTEXT: Gewicht: ${userProfile.weightKg}kg, Größe: ${userProfile.heightCm}cm, Schritte: ${userProfile.dailySteps}, Sport: ${userProfile.sportsHours}h/Woche, Bekannte Vorerkrankungen/Diagnosen: "${userProfile.conditions}"]\n${enrichedText}`;
     }
+
+    // Contextual Injection: Bloodwork & Caffeine Levels into Chat Context
+    try {
+      const savedBlood = localStorage.getItem('aura_latest_bloodwork');
+      if (savedBlood) {
+        const b = JSON.parse(savedBlood);
+        enrichedText = `[AKTUELLER LABOR-STATUS: Vitalitäts-Score: ${b.overallScore}/100. Wichtige Werte: ${b.markers?.map(m => `${m.name}: ${m.value} (${m.status})`).slice(0, 4).join(', ')}]\n${enrichedText}`;
+      }
+      const todayK = new Date().toISOString().split('T')[0];
+      const savedCaff = localStorage.getItem(`aura_caffeine_${todayK}`);
+      if (savedCaff) {
+        const cList = JSON.parse(savedCaff);
+        let activeMg = 0;
+        const nowMs = Date.now();
+        cList.forEach(c => {
+          const hours = Math.max(0, (nowMs - c.timestamp) / (3600 * 1000));
+          activeMg += c.mg * Math.pow(0.5, hours / 5.5);
+        });
+        if (activeMg > 5) {
+          enrichedText = `[KOFFEIN-STATUS: Aktuell ca. ${Math.round(activeMg)} mg aktives Restkoffein im Blut]\n${enrichedText}`;
+        }
+      }
+    } catch(e) {}
+
     if (attachedDocument) {
       enrichedText = `[DOKUMENT ANALYSIEREN: ${attachedDocument.name}]\nInhalt des Dokuments:\n"""\n${attachedDocument.content}\n"""\n\nNutzer-Anweisung: ${textToSend || 'Bitte analysiere und fasse dieses Dokument zusammen.'}`;
     }

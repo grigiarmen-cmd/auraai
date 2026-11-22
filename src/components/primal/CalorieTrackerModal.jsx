@@ -3,7 +3,7 @@ import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
 import { 
   Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Scale, 
-  Clock, QrCode, Camera, ShieldCheck, AlertTriangle, ChevronRight, Zap, Droplet
+  Clock, QrCode, Camera, ShieldCheck, AlertTriangle, ChevronRight, ChevronLeft, Zap, Droplet
 } from 'lucide-react';
 import { getBiochemicalProfile, scaleBiochemicalValues } from '../../services/deepNutritionService';
 
@@ -24,16 +24,49 @@ export default function CalorieTrackerModal({
   const [activeUnitLabel, setActiveUnitLabel] = useState('100g Standard');
   const [mealCategory, setMealCategory] = useState('Mittagessen');
 
+  // Selected Day Offset (0 = Heute, -1 = Gestern, etc.)
+  const [dayOffset, setDayOffset] = useState(0);
+
+  const getTargetDateKey = (offset) => {
+    const d = new Date();
+    d.setDate(d.getDate() + offset);
+    return d.toISOString().split('T')[0];
+  };
+
+  const currentDateKey = getTargetDateKey(dayOffset);
+
   // Daily Log State
-  const todayKey = new Date().toISOString().split('T')[0];
   const [dailyEntries, setDailyEntries] = useState(() => {
     try {
-      const saved = localStorage.getItem(`aura_meals_${todayKey}`);
+      const saved = localStorage.getItem(`aura_meals_${currentDateKey}`);
       if (saved) return JSON.parse(saved);
     } catch(e) {}
-    return [
+    return dayOffset === 0 ? [
       { id: '1', name: '3 Rühreier in Weidebutter', category: 'Frühstück', amount: '1 Portion (180g)', calories: 340, protein: 21, fat: 28, carbs: 1.5, time: '08:30' }
-    ];
+    ] : [];
+  });
+
+  // Reload entries when day changes
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`aura_meals_${currentDateKey}`);
+      if (saved) {
+        setDailyEntries(JSON.parse(saved));
+      } else {
+        setDailyEntries([]);
+      }
+    } catch(e) {
+      setDailyEntries([]);
+    }
+  }, [currentDateKey]);
+
+  // Read Bloodwork to provide smart recommendations in search
+  const [bloodReport] = useState(() => {
+    try {
+      const b = localStorage.getItem('aura_latest_bloodwork');
+      if (b) return JSON.parse(b);
+    } catch(e) {}
+    return null;
   });
 
   // User Profile Target
@@ -175,6 +208,35 @@ export default function CalorieTrackerModal({
           </button>
         </div>
 
+        {/* Day Navigation Header (Swipe / Click between Yesterday, Today, etc.) */}
+        <div className="flex items-center justify-between bg-[#11141e] border border-zinc-800 rounded-2xl px-3 py-2 text-xs">
+          <button
+            onClick={() => setDayOffset(prev => prev - 1)}
+            className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors"
+          >
+            <ChevronLeft size={16} />
+            <span className="text-[11px]">Vorheriger Tag</span>
+          </button>
+
+          <div className="text-center font-bold text-white flex items-center gap-1.5">
+            <span className={dayOffset === 0 ? 'text-amber-400' : 'text-zinc-200'}>
+              {dayOffset === 0 ? 'Heute' : (dayOffset === -1 ? 'Gestern' : currentDateKey)}
+            </span>
+            {dayOffset === 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
+          </div>
+
+          <button
+            onClick={() => setDayOffset(prev => Math.min(0, prev + 1))}
+            disabled={dayOffset === 0}
+            className={`flex items-center gap-1 transition-colors ${
+              dayOffset === 0 ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-400 hover:text-white'
+            }`}
+          >
+            <span className="text-[11px]">Nächster Tag</span>
+            <ChevronRight size={16} />
+          </button>
+        </div>
+
         {/* 1. Calorie Budget Speedometer & Remaining Display */}
         <div className="p-3.5 sm:p-4 rounded-2xl bg-[#11131a] border border-zinc-800/80 space-y-2.5">
           <div className="flex items-center justify-between">
@@ -233,6 +295,17 @@ export default function CalorieTrackerModal({
               className="w-full bg-[#11131a] border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
             />
           </div>
+
+          {/* Bloodwork Intelligent Recommendation Pill */}
+          {bloodReport && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-[11px] text-rose-300">
+              <Sparkles size={13} className="shrink-0 text-rose-400" />
+              <span>
+                <strong>Aura Labor-Fokus:</strong> Bevorzuge Lebensmittel reich an{' '}
+                <strong className="text-white">Cholin, Häm-Eisen & Zink</strong> (aus deinem Blutbild-Check).
+              </span>
+            </div>
+          )}
 
           {/* Autocomplete Search Dropdown */}
           {searchResults.length > 0 && (

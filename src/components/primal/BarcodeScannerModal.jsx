@@ -70,11 +70,28 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
           await html5QrCode.start(
             { facingMode: "environment" },
             {
-              fps: 10,
-              qrbox: { width: 250, height: 160 }
+              fps: 15,
+              qrbox: { width: 260, height: 160 }
             },
             (decodedText) => {
               console.log("Barcode scanned by camera:", decodedText);
+              // Haptic feedback & Audio feedback
+              try {
+                if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(1320, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
+              } catch(e) {}
+
               setBarcodeInput(decodedText);
               handleScanOrSubmit(decodedText);
               stopCamera();
