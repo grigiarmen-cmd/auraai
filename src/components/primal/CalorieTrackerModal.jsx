@@ -1421,79 +1421,150 @@ export default function CalorieTrackerModal({
           </div>
         )}
 
-        {/* 8. Edit / View Meal Details Modal (wenn man auf eine eingetragene Mahlzeit tippt) */}
-        {editingMeal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
-            <div className="w-full max-w-sm bg-[#111319] border border-zinc-800 rounded-3xl p-5 shadow-2xl space-y-4">
-              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
-                <span className="font-bold text-white text-sm">Mahlzeit bearbeiten</span>
-                <button
-                  type="button"
-                  onClick={() => setEditingMeal(null)}
-                  className="p-1 rounded-lg text-zinc-400 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-              </div>
+        {/* 8. Edit / View Meal Details Modal (1:1 matching Screenshot from Video Frame sec 110) */}
+        {editingMeal && (() => {
+          const defaultGram = parseInt((editingMeal.amount || '').match(/(\d+)\s*g/i)?.[1] || 100, 10);
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
+              <div className="w-full max-w-sm bg-[#111319] border border-zinc-800 rounded-3xl p-5 shadow-2xl flex flex-col justify-between min-h-[460px]">
+                
+                {/* Header matching FDDB: X on left, "Eintrag bearbeiten" center, Trash on right */}
+                <div>
+                  <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+                    <button
+                      type="button"
+                      onClick={() => setEditingMeal(null)}
+                      className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    >
+                      <X size={20} />
+                    </button>
+                    <span className="font-bold text-white text-sm">Eintrag bearbeiten</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        removeMeal(editingMeal.id);
+                        setEditingMeal(null);
+                      }}
+                      className="p-1.5 rounded-xl text-zinc-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                      title="Eintrag löschen"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
 
-              <div>
-                <h4 className="text-base font-bold text-white">{editingMeal.name}</h4>
-                <p className="text-xs text-zinc-400 mt-0.5">{editingMeal.amount || 'Standardportion'}</p>
-              </div>
+                  {/* Title & Brand */}
+                  <div className="mt-4">
+                    <h4 className="text-lg font-bold text-white">{editingMeal.name}</h4>
+                    <span className="text-xs text-zinc-400 block mt-0.5">Aura Food Database</span>
+                  </div>
 
-              <div className="grid grid-cols-4 gap-2 text-center py-2 bg-[#181c28] rounded-2xl border border-zinc-800">
-                <div>
-                  <span className="text-sm font-bold text-white font-mono">{editingMeal.calories}</span>
-                  <span className="text-[10px] text-zinc-400 block font-medium">kcal</span>
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-rose-300 font-mono">{editingMeal.fat || 0} g</span>
-                  <span className="text-[10px] text-zinc-400 block font-medium">Fett</span>
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-amber-300 font-mono">{editingMeal.carbs || 0} g</span>
-                  <span className="text-[10px] text-zinc-400 block font-medium">KH</span>
-                </div>
-                <div>
-                  <span className="text-sm font-bold text-emerald-300 font-mono">{editingMeal.protein || 0} g</span>
-                  <span className="text-[10px] text-zinc-400 block font-medium">Protein</span>
-                </div>
-              </div>
+                  {/* 4 Macro Pillars matching FDDB */}
+                  <div className="grid grid-cols-4 gap-2 text-center py-3 mt-3">
+                    <div>
+                      <span className="text-sm font-black text-white font-mono block">{editingMeal.calories}</span>
+                      <span className="text-[10px] text-zinc-400 font-medium">kcal</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-black text-white font-mono block">{editingMeal.fat || 0} g</span>
+                      <span className="text-[10px] text-zinc-400 font-medium">Fett</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-black text-white font-mono block">{editingMeal.carbs || 0} g</span>
+                      <span className="text-[10px] text-zinc-400 font-medium">KH</span>
+                    </div>
+                    <div>
+                      <span className="text-sm font-black text-white font-mono block">{editingMeal.protein || 0} g</span>
+                      <span className="text-[10px] text-zinc-400 font-medium">Protein</span>
+                    </div>
+                  </div>
 
-              <div className="space-y-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newCal = prompt("Kalorien anpassen:", editingMeal.calories);
-                    if (newCal !== null) {
-                      const updated = dailyEntries.map(m => m.id === editingMeal.id ? { ...m, calories: Number(newCal) || m.calories } : m);
+                  {/* Portion & Unit Input Box matching FDDB Frame 110 */}
+                  <div className="flex gap-2.5 mt-2">
+                    <div className="w-1/3 bg-[#181c28] border-2 border-sky-400/80 rounded-2xl p-2.5 text-center flex flex-col justify-center">
+                      <input
+                        type="number"
+                        id="edit-meal-gram-input"
+                        defaultValue={defaultGram}
+                        className="w-full bg-transparent text-center font-mono text-base font-bold text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="w-2/3 bg-[#181c28] border border-zinc-700/80 rounded-2xl px-4 py-2.5 flex items-center justify-between text-xs font-semibold text-zinc-200">
+                      <span>Gramm (g)</span>
+                      <ChevronDown size={16} className="text-zinc-400" />
+                    </div>
+                  </div>
+
+                  {/* Zeitpunkt Card */}
+                  <div className="mt-4 p-3.5 rounded-2xl bg-[#141824] border border-zinc-800 space-y-1.5">
+                    <span className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider block">Zeitpunkt</span>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-zinc-300 flex items-center gap-1.5">
+                        <Clock size={13} className="text-sky-400" /> Datum & Uhrzeit
+                      </span>
+                      <span className="font-semibold text-white bg-zinc-800/80 px-2.5 py-1 rounded-lg border border-zinc-700">
+                        {editingMeal.time || 'Heute'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Buttons matching FDDB Frame 110 */}
+                <div className="space-y-2 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const input = document.getElementById('edit-meal-gram-input');
+                      const newGram = parseInt(input?.value || defaultGram, 10);
+                      const ratio = newGram / (defaultGram || 100);
+                      const updated = dailyEntries.map(m => {
+                        if (m.id === editingMeal.id) {
+                          return {
+                            ...m,
+                            amount: `${newGram} g`,
+                            calories: Math.round(m.calories * ratio),
+                            protein: Math.round((m.protein || 0) * ratio * 10) / 10,
+                            fat: Math.round((m.fat || 0) * ratio * 10) / 10,
+                            carbs: Math.round((m.carbs || 0) * ratio * 10) / 10,
+                          };
+                        }
+                        return m;
+                      });
                       setDailyEntries(updated);
                       try {
                         localStorage.setItem(`aura_meals_${currentDateKey}`, JSON.stringify(updated));
                       } catch(e) {}
-                    }
-                    setEditingMeal(null);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition-all"
-                >
-                  Nährwerte / Portion ändern
-                </button>
+                      setEditingMeal(null);
+                    }}
+                    className="w-full py-3.5 rounded-2xl bg-[#60a5fa] hover:bg-[#93c5fd] text-black font-extrabold text-sm shadow-lg shadow-sky-500/20 active:scale-95 transition-all"
+                  >
+                    Speichern
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    removeMeal(editingMeal.id);
-                    setEditingMeal(null);
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
-                >
-                  <Trash2 size={14} />
-                  <span>Mahlzeit löschen</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const copy = {
+                        ...editingMeal,
+                        id: 'copy_' + Date.now(),
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                      };
+                      const updated = [copy, ...dailyEntries];
+                      setDailyEntries(updated);
+                      try {
+                        localStorage.setItem(`aura_meals_${currentDateKey}`, JSON.stringify(updated));
+                      } catch(e) {}
+                      setEditingMeal(null);
+                    }}
+                    className="w-full py-3 rounded-2xl bg-[#1e4a7a] hover:bg-[#255c99] text-white font-bold text-xs transition-all active:scale-95"
+                  >
+                    Kopieren
+                  </button>
+                </div>
+
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
       </div>
     </div>
