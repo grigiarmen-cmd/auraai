@@ -1345,6 +1345,53 @@ export default function App() {
             </div>
           </div>
         </footer>
+
+        {/* Mobile Fixed Bottom Navigation Bar (Ultra-clean App feel on Android & iOS) */}
+        <nav className="sm:hidden border-t border-[#1a1c24] bg-[#0c0d12]/95 backdrop-blur-lg px-2 py-1.5 flex items-center justify-around z-30 shrink-0">
+          <button
+            onClick={() => {
+              setIsCalorieTrackerOpen(false);
+              setIsBarcodeScannerOpen(false);
+              setIsMealVisionOpen(false);
+            }}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-white transition-colors"
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span className="text-[9px] font-medium">Chat</span>
+          </button>
+
+          <button
+            onClick={() => setIsCalorieTrackerOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-rose-400 transition-colors"
+          >
+            <Flame className="w-4 h-4 text-rose-400" />
+            <span className="text-[9px] font-medium">Tracker</span>
+          </button>
+
+          <button
+            onClick={() => setIsBarcodeScannerOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-amber-400 transition-colors"
+          >
+            <QrCode className="w-4 h-4 text-amber-400" />
+            <span className="text-[9px] font-medium">Scanner</span>
+          </button>
+
+          <button
+            onClick={() => setIsMealVisionOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-orange-400 transition-colors"
+          >
+            <Camera className="w-4 h-4 text-orange-400" />
+            <span className="text-[9px] font-medium">Vision</span>
+          </button>
+
+          <button
+            onClick={() => setIsAuthModalOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-indigo-400 transition-colors"
+          >
+            <Shield className="w-4 h-4 text-indigo-400" />
+            <span className="text-[9px] font-medium">{userProfile ? 'Profil' : 'Login'}</span>
+          </button>
+        </nav>
       </div>
 
       {/* Aura Musikliste / Jukebox Sidebar */}
@@ -1701,6 +1748,14 @@ export default function App() {
       <CalorieTrackerModal
         isOpen={isCalorieTrackerOpen}
         onClose={() => setIsCalorieTrackerOpen(false)}
+        onOpenBarcodeScanner={() => {
+          setIsCalorieTrackerOpen(false);
+          setIsBarcodeScannerOpen(true);
+        }}
+        onOpenMealVision={() => {
+          setIsCalorieTrackerOpen(false);
+          setIsMealVisionOpen(true);
+        }}
       />
 
       <BarcodeScannerModal
