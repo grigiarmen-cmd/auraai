@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
-import { searchFoodDatabase as searchLocalFoodDatabase } from '../../services/foodDatabase';
 import { Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Apple, ChevronRight, Activity, Clock } from 'lucide-react';
 
 export default function CalorieTrackerModal({ isOpen, onClose }) {
@@ -47,21 +46,11 @@ export default function CalorieTrackerModal({ isOpen, onClose }) {
     }
     setIsSearching(true);
     try {
-      // 1. Try Local Food Database directly in frontend for instant offline response
-      const localResults = searchLocalFoodDatabase(q);
-      
-      // 2. Fetch from backend if available
-      try {
-        const res = await fetch(`${API_BASE}/api/food/search?q=${encodeURIComponent(q)}`);
-        if (res.ok) {
-          const data = await res.json();
-          const items = data.foods || data.results || [];
-          setSearchResults(items.length > 0 ? items : localResults);
-          return;
-        }
-      } catch(e) {}
-      
-      setSearchResults(localResults);
+      const res = await fetch(`${API_BASE}/api/food/search?q=${encodeURIComponent(q)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data.foods || data.results || []);
+      }
     } catch(e) {
       console.error(e);
     } finally {
