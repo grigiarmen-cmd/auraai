@@ -50,6 +50,12 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const [goal, setGoal] = useState('recomposition'); // 'fat_loss' | 'muscle_gain' | 'recomposition'
   const [conditions, setConditions] = useState('');
 
+  // Manuelle Makro & Kalorien-Ziele (Optional überschreibbar)
+  const [customCalories, setCustomCalories] = useState('');
+  const [customProtein, setCustomProtein] = useState('');
+  const [customFat, setCustomFat] = useState('');
+  const [customCarbs, setCustomCarbs] = useState('');
+
   // Selected Sports & Chores with Hours
   const [selectedSports, setSelectedSports] = useState([
     { sportId: 'weightlifting', hoursPerWeek: 4 }
@@ -175,6 +181,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const pal = (tdee / bmr).toFixed(2);
 
   const handleSaveProfile = () => {
+    const finalCalories = Number(customCalories) || targetCalories;
     const profile = {
       email,
       weightKg: w,
@@ -187,7 +194,13 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       bmr,
       tdee,
       pal,
-      targetCalories,
+      targetCalories: finalCalories,
+      customMacros: {
+        calories: finalCalories,
+        protein: Number(customProtein) || Math.round(w * 2.2),
+        fat: Number(customFat) || Math.round(w * 0.9),
+        carbs: Number(customCarbs) || Math.round((finalCalories - (w * 2.2 * 4) - (w * 0.9 * 9)) / 4)
+      },
       goal,
       conditions: conditions.trim(),
       notionToken: userNotionToken.trim(),
@@ -483,6 +496,58 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
                 onChange={(e) => setConditions(e.target.value)}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
               />
+            </div>
+
+            {/* 6. Kalorien- & Makroziele anpassen */}
+            <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
+              <span className="font-bold text-amber-400 flex items-center gap-1.5">
+                <Activity size={14} /> Individuelle Kalorien- & Makro-Ziele (Optional):
+              </span>
+              <p className="text-[11px] text-zinc-400">
+                Automatisch berechnet: <span className="text-white font-bold">{targetCalories} kcal</span>. Trage hier eigene Werte ein, wenn du sie manuell festlegen willst:
+              </p>
+              <div className="grid grid-cols-4 gap-2 pt-1">
+                <div>
+                  <label className="text-[10px] text-zinc-400 block mb-0.5">Kcal Ziel</label>
+                  <input
+                    type="number"
+                    placeholder={targetCalories.toString()}
+                    value={customCalories}
+                    onChange={(e) => setCustomCalories(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1 text-center font-bold text-amber-300 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 block mb-0.5">Protein (g)</label>
+                  <input
+                    type="number"
+                    placeholder="180"
+                    value={customProtein}
+                    onChange={(e) => setCustomProtein(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1 text-center font-bold text-emerald-400 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 block mb-0.5">Fett (g)</label>
+                  <input
+                    type="number"
+                    placeholder="80"
+                    value={customFat}
+                    onChange={(e) => setCustomFat(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1 text-center font-bold text-amber-400 text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 block mb-0.5">Carbs (g)</label>
+                  <input
+                    type="number"
+                    placeholder="200"
+                    value={customCarbs}
+                    onChange={(e) => setCustomCarbs(e.target.value)}
+                    className="w-full bg-zinc-950 border border-zinc-700 rounded-lg px-2 py-1 text-center font-bold text-blue-400 text-xs"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* 6. Optionales Notion Second-Brain (Eigener Token oder Integrierter Speicher) */}

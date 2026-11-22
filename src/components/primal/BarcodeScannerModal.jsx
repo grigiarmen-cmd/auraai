@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
-import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink, Flame, Check } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
+import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink, Flame, Check, Camera, Type } from 'lucide-react';
 
 export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStore, onAddToTracker }) {
   const [barcodeInput, setBarcodeInput] = useState('');
+  const [scanMode, setScanMode] = useState('text'); // 'text' | 'camera'
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState(null);
+  const scannerRef = useRef(null);
   const [isLoading, setIsLoading] = useState(false);
   const [productData, setProductData] = useState(null);
   const [error, setError] = useState(null);
@@ -32,6 +37,51 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Camera Lifecycle
+  useEffect(() => {
+    if (scanMode === 'camera' && isOpen) {
+      const html5QrCode = new Html5Qrcode("aura-barcode-reader");
+      scannerRef.current = html5QrCode;
+      setIsCameraActive(true);
+      setCameraError(null);
+
+      html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 160 }
+        },
+        (decodedText) => {
+          console.log("Barcode scanned by camera:", decodedText);
+          setBarcodeInput(decodedText);
+          handleScanOrSubmit(decodedText);
+          stopCamera();
+          setScanMode('text');
+        },
+        (errorMessage) => {
+          // ignore frame errors
+        }
+      ).catch((err) => {
+        console.warn("Camera start failed:", err);
+        setCameraError("Kamera konnte nicht gestartet werden. Bitte Barcode manuell eingeben.");
+        setIsCameraActive(false);
+      });
+
+      return () => {
+        stopCamera();
+      };
+    }
+  }, [scanMode, isOpen]);
+
+  const stopCamera = () => {
+    if (scannerRef.current && scannerRef.current.isScanning) {
+      scannerRef.current.stop().then(() => {
+        scannerRef.current.clear();
+      }).catch(console.error);
+    }
+    setIsCameraActive(false);
   };
 
   const getVerdictBadge = (verdict) => {
@@ -81,34 +131,68 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
           </button>
         </div>
 
-        {/* Input Bar */}
-        <div className="p-6 border-b border-zinc-800/50 bg-zinc-900/30">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Barcode eingeben (EAN-Nummer) oder Barcode vor die Kamera halten..."
-                value={barcodeInput}
-                onChange={(e) => setBarcodeInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleScanOrSubmit()}
-                className="w-full bg-zinc-900/90 border border-zinc-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all font-mono"
-              />
-            </div>
-            <button
-              onClick={() => handleScanOrSubmit()}
-              disabled={isLoading || !barcodeInput.trim()}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-semibold text-sm transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
-            >
-              {isLoading ? (
-                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Search size={18} /> Scannen
-                </>
-              )}
-            </button>
-          </div>
+        {/* Mode Selector */}
+        <div className="px-6 py-2.5 border-b border-zinc-800/60 bg-zinc-900/40 flex items-center gap-2">
+          <button
+            onClick={() => { stopCamera(); setScanMode('text'); }}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              scanMode === 'text'
+                ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20 font-bold'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+            }`}
+          >
+            <Type size={14} /> Barcode als Text / Zahl
+          </button>
+          <button
+            onClick={() => setScanMode('camera')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all ${
+              scanMode === 'camera'
+                ? 'bg-amber-500 text-black shadow-md shadow-amber-500/20 font-bold'
+                : 'text-zinc-400 hover:text-white hover:bg-zinc-800/50'
+            }`}
+          >
+            <Camera size={14} /> Live Kamera-Scan
+          </button>
         </div>
+
+        {/* Input Bar or Camera Viewfinder */}
+        {scanMode === 'camera' ? (
+          <div className="p-4 border-b border-zinc-800/50 bg-black flex flex-col items-center justify-center">
+            <div id="aura-barcode-reader" className="w-full max-w-sm rounded-2xl overflow-hidden border border-amber-500/50 shadow-lg" />
+            {cameraError && (
+              <p className="text-xs text-rose-400 mt-2">{cameraError}</p>
+            )}
+            <p className="text-[11px] text-zinc-400 mt-2">Halte den Produkt-Barcode mittig vor deine Kamera</p>
+          </div>
+        ) : (
+          <div className="p-6 border-b border-zinc-800/50 bg-zinc-900/30">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  placeholder="Barcode eingeben (z.B. 4047247956277)..."
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleScanOrSubmit()}
+                  className="w-full bg-zinc-900/90 border border-zinc-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all font-mono"
+                />
+              </div>
+              <button
+                onClick={() => handleScanOrSubmit()}
+                disabled={isLoading || !barcodeInput.trim()}
+                className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-black font-semibold text-sm transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isLoading ? (
+                  <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Search size={18} /> Scannen
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-y-auto p-6 space-y-6">

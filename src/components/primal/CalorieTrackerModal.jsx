@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
+import { searchFoodDatabase as searchLocalFoodDatabase } from '../../services/foodDatabase';
 import { Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Apple, ChevronRight, Activity, Clock } from 'lucide-react';
 
 export default function CalorieTrackerModal({ isOpen, onClose }) {
@@ -46,11 +47,21 @@ export default function CalorieTrackerModal({ isOpen, onClose }) {
     }
     setIsSearching(true);
     try {
-      const res = await fetch(`${API_BASE}/api/food/search?q=${encodeURIComponent(q)}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSearchResults(data.results || []);
-      }
+      // 1. Try Local Food Database directly in frontend for instant offline response
+      const localResults = searchLocalFoodDatabase(q);
+      
+      // 2. Fetch from backend if available
+      try {
+        const res = await fetch(`${API_BASE}/api/food/search?q=${encodeURIComponent(q)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const items = data.foods || data.results || [];
+          setSearchResults(items.length > 0 ? items : localResults);
+          return;
+        }
+      } catch(e) {}
+      
+      setSearchResults(localResults);
     } catch(e) {
       console.error(e);
     } finally {
@@ -100,9 +111,9 @@ export default function CalorieTrackerModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-wide flex items-center gap-1.5">
-                Aura Calorie & Nutrient Tracker <Sparkles size={14} className="text-amber-400" />
+                Aura Nährstoff & Kalorien-Tracker <Sparkles size={14} className="text-amber-400" />
               </h2>
-              <p className="text-[11px] text-zinc-400">Yazio-Style Stoffwechseltagebuch & 24h-Report</p>
+              <p className="text-[11px] text-zinc-400">Tagesbudget, Makros & Mahlzeiten-Suche</p>
             </div>
           </div>
           <button 
