@@ -11,7 +11,7 @@ function fetchFddbByBarcode(barcode) {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36'
       },
-      timeout: 3500
+      timeout: 4000
     };
 
     const req = https.get(url, options, (res) => {
@@ -127,7 +127,11 @@ module.exports = async (req, res) => {
       }
     });
 
-    const analysis = await generateDeepScienceAnalysis(product, detectedToxins);
+    const productName = product.product_name || product.product_name_de || 'Unbekanntes Produkt';
+    const ingredientsText = product.ingredients_text || 'Keine Zutatenliste verfügbar';
+
+    // generateDeepScienceAnalysis(productName, ingredientsText, detectedToxins)
+    const analysis = await generateDeepScienceAnalysis(productName, ingredientsText, detectedToxins);
 
     const nutriments = product.nutriments || {};
     const calories = nutriments['energy-kcal_100g'] || nutriments['energy-kcal'] || 150;
@@ -136,11 +140,11 @@ module.exports = async (req, res) => {
     const carbs = nutriments['carbohydrates_100g'] || nutriments['carbohydrates'] || 15;
 
     res.status(200).json({
-      name: product.product_name || product.product_name_de || 'Unbekanntes Produkt',
-      productName: product.product_name || product.product_name_de || 'Unbekanntes Produkt',
+      name: productName,
+      productName: productName,
       brand: product.brands || '',
       imageUrl: product.image_url || product.image_front_url || null,
-      ingredients: product.ingredients_text || 'Keine Zutatenliste verfügbar',
+      ingredients: ingredientsText,
       nutrients: {
         calories: `${calories} kcal`,
         protein: `${protein} g`,
@@ -153,6 +157,7 @@ module.exports = async (req, res) => {
       carbs,
       toxinsCount: detectedToxins.length,
       detectedToxins: detectedToxins,
+      science: analysis,
       ...analysis
     });
   } catch (err) {
