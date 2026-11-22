@@ -1,4 +1,4 @@
-const { verificationStore, generateVerificationCode, sendVerificationEmail } = require('../../src/services/authService');
+const { getCodeForWindow, sendVerificationEmail } = require('../../src/services/authService');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,10 +19,7 @@ module.exports = async (req, res) => {
       return res.status(400).json({ error: 'Gültige E-Mail erforderlich' });
     }
 
-    const code = generateVerificationCode();
-    const expiresAt = Date.now() + 15 * 60 * 1000;
-
-    verificationStore.set(email.toLowerCase(), { code, expiresAt });
+    const code = getCodeForWindow(email, 0);
     await sendVerificationEmail(email, code);
 
     console.log(`✉️ Verifizierungscode an ${email} gesendet: ${code}`);
