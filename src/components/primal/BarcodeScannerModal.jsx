@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
-import { Html5Qrcode } from 'html5-qrcode';
 import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink, Flame, Check, Camera, Type } from 'lucide-react';
 
 export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStore, onAddToTracker }) {
@@ -39,13 +38,14 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     }
   };
 
-  // Camera Lifecycle
+  // Safe Camera Lifecycle (Loads dynamically only in browser when user clicks Camera tab)
   useEffect(() => {
     let html5QrCode = null;
 
-    if (scanMode === 'camera' && isOpen) {
+    if (scanMode === 'camera' && isOpen && typeof window !== 'undefined') {
       const startScanner = async () => {
         try {
+          const { Html5Qrcode } = await import('html5-qrcode');
           const element = document.getElementById("aura-barcode-reader");
           if (!element) return;
 
@@ -71,12 +71,12 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
           );
         } catch (err) {
           console.warn("Camera start failed:", err);
-          setCameraError("Kamera-Berechtigung erforderlich oder nicht verfügbar.");
+          setCameraError("Kamera-Zugriff konnte nicht geladen werden oder Berechtigung fehlt.");
           setIsCameraActive(false);
         }
       };
 
-      const timer = setTimeout(startScanner, 200);
+      const timer = setTimeout(startScanner, 300);
 
       return () => {
         clearTimeout(timer);
