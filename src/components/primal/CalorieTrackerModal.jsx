@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
 import { 
   Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Scale, 
-  Clock, QrCode, Camera, ShieldCheck, AlertTriangle, ChevronRight, ChevronLeft, Zap, Droplet
+  Clock, QrCode, Camera, ShieldCheck, AlertTriangle, ChevronRight, ChevronLeft, Zap, Droplet,
+  ChevronDown, ChevronUp, PieChart, BookOpen, Utensils
 } from 'lucide-react';
 import { getBiochemicalProfile, scaleBiochemicalValues } from '../../services/deepNutritionService';
 
@@ -28,6 +29,24 @@ export default function CalorieTrackerModal({
 
   // Selected Day Offset (0 = Heute, -1 = Gestern, etc.)
   const [dayOffset, setDayOffset] = useState(0);
+
+  // Carousel Slide Index for Dashboard Stats (0: Gauge Speedometer, 1: Macro Breakdown, 2: Micronutrients/Electrolytes, 3: Equation Summary)
+  const [dashboardSlide, setDashboardSlide] = useState(0);
+
+  // Quick Action FAB Menu State (+ button bottom right)
+  const [isFabOpen, setIsFabOpen] = useState(false);
+
+  // Accordion open state for meal categories (Frühstück, Mittagessen, Abendessen, Snacks)
+  const [openCategories, setOpenCategories] = useState({
+    'Frühstück': true,
+    'Mittagessen': true,
+    'Abendessen': true,
+    'Snack': true
+  });
+
+  const toggleCategory = (cat) => {
+    setOpenCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
 
   const getTargetDateKey = (offset) => {
     const d = new Date();
@@ -320,105 +339,195 @@ export default function CalorieTrackerModal({
           </span>
         </div>
 
-        {/* 1. Cyberpunk OLED Circular Gauge & Target Hub */}
-        <div className="p-4 sm:p-5 rounded-3xl bg-[#0c0e15] border border-zinc-800/90 relative overflow-hidden shadow-xl">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            
-            {/* Left Stat: Gegessen */}
-            <div className="text-center sm:text-left">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Gegessen</span>
-              <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{totalCalories}</p>
-              <span className="text-[10px] text-sky-400 font-semibold">{progressPercent}% erreicht</span>
-            </div>
+        {/* 1. Multi-View Dashboard Carousel (FDDB-Style Swiper with Dots) */}
+        <div className="p-4 rounded-3xl bg-[#0c0e15] border border-zinc-800/90 relative overflow-hidden shadow-xl">
+          
+          {/* Slide 0: Speedometer Arc + Macro Bars */}
+          {dashboardSlide === 0 && (
+            <div className="space-y-3 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                {/* Left Stat: Gegessen */}
+                <div className="text-center sm:text-left">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Gegessen</span>
+                  <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{totalCalories}</p>
+                  <span className="text-[10px] text-sky-400 font-semibold">{progressPercent}% erreicht</span>
+                </div>
 
-            {/* Center: Glowing Circular Arc Speedometer */}
-            <div className="relative w-40 h-28 flex flex-col items-center justify-end">
-              <svg className="w-36 h-28 overflow-visible" viewBox="0 0 140 85">
-                {/* Background Arc */}
-                <path
-                  d="M 15 75 A 55 55 0 0 1 125 75"
-                  fill="none"
-                  stroke="#1f2430"
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                />
-                {/* Glowing Progress Arc */}
-                <path
-                  d="M 15 75 A 55 55 0 0 1 125 75"
-                  fill="none"
-                  stroke={caloriesRemaining < 0 ? '#f43f5e' : '#38bdf8'}
-                  strokeWidth="10"
-                  strokeLinecap="round"
-                  strokeDasharray="172"
-                  strokeDashoffset={172 - (172 * Math.min(100, progressPercent)) / 100}
-                  className="transition-all duration-700 ease-out"
-                />
-              </svg>
+                {/* Center: Glowing Circular Arc Speedometer */}
+                <div className="relative w-40 h-28 flex flex-col items-center justify-end">
+                  <svg className="w-36 h-28 overflow-visible" viewBox="0 0 140 85">
+                    {/* Background Arc */}
+                    <path
+                      d="M 15 75 A 55 55 0 0 1 125 75"
+                      fill="none"
+                      stroke="#1f2430"
+                      strokeWidth="10"
+                      strokeLinecap="round"
+                    />
+                    {/* Glowing Progress Arc */}
+                    <path
+                      d="M 15 75 A 55 55 0 0 1 125 75"
+                      fill="none"
+                      stroke={caloriesRemaining < 0 ? '#f43f5e' : '#38bdf8'}
+                      strokeWidth="10"
+                      strokeLinecap="round"
+                      strokeDasharray="172"
+                      strokeDashoffset={172 - (172 * Math.min(100, progressPercent)) / 100}
+                      className="transition-all duration-700 ease-out"
+                    />
+                  </svg>
 
-              {/* Inside Arc: Calories Remaining */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center pt-5">
-                <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
-                  caloriesRemaining < 0 ? 'text-rose-400' : 'text-white'
-                }`}>
-                  {Math.max(0, caloriesRemaining)}
-                </span>
-                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">kcal übrig</span>
+                  {/* Inside Arc: Calories Remaining */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pt-5">
+                    <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
+                      caloriesRemaining < 0 ? 'text-rose-400' : 'text-white'
+                    }`}>
+                      {Math.max(0, caloriesRemaining)}
+                    </span>
+                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">kcal übrig</span>
+                  </div>
+                </div>
+
+                {/* Right Stat: Ziel & Verbrannt */}
+                <div className="text-center sm:text-right">
+                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Tagesziel</span>
+                  <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{calorieTarget}</p>
+                  <span className="text-[10px] text-emerald-400 font-semibold">0 verbrannt</span>
+                </div>
+              </div>
+
+              {/* Macro Progress Bars */}
+              <div className="grid grid-cols-3 gap-3 pt-3 border-t border-zinc-800/60">
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-zinc-400 font-bold">Fett</span>
+                    <span className="text-rose-300 font-mono">{totalFat}/65g</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
+                    <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.min(100, (totalFat / 65) * 100)}%` }} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-zinc-400 font-bold">KH</span>
+                    <span className="text-amber-300 font-mono">{totalCarbs}/220g</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
+                    <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, (totalCarbs / 220) * 100)}%` }} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between text-[11px]">
+                    <span className="text-zinc-400 font-bold">Protein</span>
+                    <span className="text-emerald-300 font-mono">{totalProtein}/160g</span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
+                    <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, (totalProtein / 160) * 100)}%` }} />
+                  </div>
+                </div>
               </div>
             </div>
+          )}
 
-            {/* Right Stat: Ziel & Verbrannt */}
-            <div className="text-center sm:text-right">
-              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Tagesziel</span>
-              <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{calorieTarget}</p>
-              <span className="text-[10px] text-emerald-400 font-semibold">0 verbrannt</span>
+          {/* Slide 1: Pure Grams & Kcal Display */}
+          {dashboardSlide === 1 && (
+            <div className="grid grid-cols-4 gap-2 text-center py-3 animate-in fade-in duration-200">
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-rose-400 font-mono">{totalFat}g</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Fett</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{totalCarbs}g</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">KH</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">{totalProtein}g</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Protein</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-sky-500/30">
+                <span className="text-xl sm:text-2xl font-black text-sky-400 font-mono">{totalCalories}</span>
+                <span className="text-[10px] text-sky-300 uppercase tracking-wider block mt-1 font-semibold">kcal</span>
+              </div>
             </div>
+          )}
 
+          {/* Slide 2: Electrolytes & Hydration (Salz, Kalium, Wasser, Gesättigt) */}
+          {dashboardSlide === 2 && (
+            <div className="grid grid-cols-4 gap-2 text-center py-3 animate-in fade-in duration-200">
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-cyan-300 font-mono">6.2g</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Meersalz</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-purple-300 font-mono">3.8g</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Kalium</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-blue-400 font-mono">2.4L</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Wasser</span>
+              </div>
+              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
+                <span className="text-xl sm:text-2xl font-black text-amber-300 font-mono">28g</span>
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Gesätt. Fett</span>
+              </div>
+            </div>
+          )}
+
+          {/* Slide 3: Formula Equation: Ziel - Gegessen + Verbrannt = Übrig */}
+          {dashboardSlide === 3 && (
+            <div className="flex items-center justify-around text-center py-3 animate-in fade-in duration-200">
+              <div>
+                <span className="text-xl sm:text-2xl font-black text-white font-mono">{calorieTarget}</span>
+                <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Ziel</span>
+              </div>
+              <span className="text-zinc-500 font-bold text-lg">-</span>
+              <div>
+                <span className="text-xl sm:text-2xl font-black text-sky-400 font-mono">{totalCalories}</span>
+                <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Gegessen</span>
+              </div>
+              <span className="text-zinc-500 font-bold text-lg">+</span>
+              <div>
+                <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">0</span>
+                <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Verbrannt</span>
+              </div>
+              <span className="text-zinc-500 font-bold text-lg">=</span>
+              <div>
+                <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{Math.max(0, caloriesRemaining)}</span>
+                <span className="text-[10px] text-amber-300 block uppercase font-bold">Übrig</span>
+              </div>
+            </div>
+          )}
+
+          {/* Carousel Pagination Dots & Nav Controls */}
+          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/40 mt-1">
+            <button
+              type="button"
+              onClick={() => setDashboardSlide(prev => (prev === 0 ? 3 : prev - 1))}
+              className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div className="flex items-center gap-1.5">
+              {[0, 1, 2, 3].map(idx => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setDashboardSlide(idx)}
+                  className={`w-2 h-2 rounded-full transition-all ${
+                    dashboardSlide === idx ? 'w-5 bg-sky-400 shadow-sm shadow-sky-400/50' : 'bg-zinc-700'
+                  }`}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setDashboardSlide(prev => (prev === 3 ? 0 : prev + 1))}
+              className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
 
-          {/* Macro Progress Bars (Fett, KH, Protein) */}
-          <div className="grid grid-cols-3 gap-3 pt-4 mt-2 border-t border-zinc-800/60">
-            {/* Fett */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-zinc-400 font-bold">Fett</span>
-                <span className="text-rose-300 font-mono">{totalFat}/65g</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-rose-400 transition-all duration-500"
-                  style={{ width: `${Math.min(100, (totalFat / 65) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Kohlenhydrate */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-zinc-400 font-bold">KH</span>
-                <span className="text-amber-300 font-mono">{totalCarbs}/220g</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-amber-400 transition-all duration-500"
-                  style={{ width: `${Math.min(100, (totalCarbs / 220) * 100)}%` }}
-                />
-              </div>
-            </div>
-
-            {/* Protein */}
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-zinc-400 font-bold">Protein</span>
-                <span className="text-emerald-300 font-mono">{totalProtein}/160g</span>
-              </div>
-              <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-emerald-400 transition-all duration-500"
-                  style={{ width: `${Math.min(100, (totalProtein / 160) * 100)}%` }}
-                />
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* 2. Fast Food Search / Database Input */}
@@ -777,49 +886,156 @@ export default function CalorieTrackerModal({
           </div>
         )}
 
-        {/* 4. Daily Food Log List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-48 sm:max-h-56">
-          <div className="flex items-center justify-between text-xs text-zinc-400 font-semibold px-1">
-            <span>Heute gegessen ({dailyEntries.length})</span>
-            <span className="text-[10px] text-emerald-400 flex items-center gap-1">
-              <Clock size={12} /> 24h Auto-Sync
-            </span>
-          </div>
+        {/* 4. Categorized Food Log (Frühstück, Mittagessen, Abendessen, Snacks) - Accordion View */}
+        <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-56 sm:max-h-64 pb-12">
+          {['Frühstück', 'Mittagessen', 'Abendessen', 'Snack'].map((category) => {
+            const meals = dailyEntries.filter(m => (m.category || 'Mahlzeit') === category || (category === 'Snack' && m.category === 'Mahlzeit'));
+            const catKcal = meals.reduce((sum, m) => sum + (Number(m.calories) || 0), 0);
+            const catProt = Math.round(meals.reduce((sum, m) => sum + (Number(m.protein) || 0), 0) * 10) / 10;
+            const catFat = Math.round(meals.reduce((sum, m) => sum + (Number(m.fat) || 0), 0) * 10) / 10;
+            const catCarb = Math.round(meals.reduce((sum, m) => sum + (Number(m.carbs) || 0), 0) * 10) / 10;
+            const isOpen = openCategories[category] !== false;
 
-          {dailyEntries.length === 0 ? (
-            <div className="py-8 text-center text-xs text-zinc-500">
-              Noch keine Mahlzeiten eingetragen. Nutze die Suche oder den Barcode-Scanner!
-            </div>
-          ) : (
-            dailyEntries.map((meal) => (
-              <div 
-                key={meal.id}
-                className="p-2.5 rounded-xl bg-[#11131a] border border-zinc-800/80 flex items-center justify-between gap-3 text-xs"
-              >
-                <div className="flex-1 min-w-0">
+            return (
+              <div key={category} className="rounded-2xl bg-[#0d0f17] border border-zinc-800/80 overflow-hidden">
+                {/* Category Header */}
+                <button
+                  type="button"
+                  onClick={() => toggleCategory(category)}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-zinc-900/40 hover:bg-zinc-900/60 transition-colors text-left"
+                >
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-white truncate">{meal.name}</span>
-                    <span className="text-[10px] text-amber-400/90 bg-amber-400/10 px-1.5 py-0.2 rounded font-medium">{meal.category || 'Mahlzeit'}</span>
-                    <span className="text-[10px] text-zinc-500">{meal.time}</span>
+                    {isOpen ? <ChevronUp size={15} className="text-sky-400" /> : <ChevronDown size={15} className="text-zinc-500" />}
+                    <div>
+                      <span className="font-bold text-white text-xs">{category}</span>
+                      <span className="text-[10px] text-zinc-400 ml-2 font-mono">
+                        {catFat}g F • {catCarb}g KH • {catProt}g P
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-zinc-400 flex items-center gap-2 mt-0.5">
-                    {meal.amount && <span className="text-zinc-300 font-medium">{meal.amount} •</span>}
-                    <span>{meal.protein || 0}g P</span>
-                    <span>•</span>
-                    <span>{meal.fat || 0}g F</span>
-                    <span>•</span>
-                    <span>{meal.carbs || 0}g C</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs font-bold text-sky-400">{catKcal} kcal</span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMealCategory(category);
+                        const searchEl = document.querySelector("input[placeholder*='Mahlzeit suchen']");
+                        if (searchEl) searchEl.focus();
+                      }}
+                      className="p-1 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800"
+                      title={`${category} hinzufügen`}
+                    >
+                      <Plus size={14} />
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center gap-2.5">
-                  <span className="font-bold text-white font-mono">{meal.calories} kcal</span>
-                  <button onClick={() => removeMeal(meal.id)} className="text-zinc-500 hover:text-rose-400 p-1">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
+                </button>
+
+                {/* Meals under category */}
+                {isOpen && (
+                  <div className="divide-y divide-zinc-800/50">
+                    {meals.length === 0 ? (
+                      <div className="py-2.5 px-4 text-[11px] text-zinc-500 italic">
+                        Keine Einträge für {category}.
+                      </div>
+                    ) : (
+                      meals.map((meal) => (
+                        <div 
+                          key={meal.id}
+                          className="px-3.5 py-2 flex items-center justify-between gap-3 text-xs hover:bg-zinc-900/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-[10px] font-bold shrink-0">
+                              <Utensils size={13} className="text-amber-400" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="font-semibold text-white truncate block text-xs">{meal.name}</span>
+                              <div className="text-[10px] text-zinc-400 flex items-center gap-1.5">
+                                {meal.amount && <span>{meal.amount} •</span>}
+                                <span>{meal.fat || 0}g F</span>
+                                <span>•</span>
+                                <span>{meal.carbs || 0}g KH</span>
+                                <span>•</span>
+                                <span>{meal.protein || 0}g P</span>
+                                {meal.time && <span className="text-zinc-500">• {meal.time} Uhr</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="font-mono font-bold text-white text-xs">{meal.calories} kcal</span>
+                            <button 
+                              onClick={() => removeMeal(meal.id)} 
+                              className="text-zinc-500 hover:text-rose-400 p-1 rounded-lg hover:bg-zinc-800/60"
+                              title="Löschen"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
               </div>
-            ))
+            );
+          })}
+        </div>
+
+        {/* 5. Floating Action Button (FAB) Bottom-Right with Menu */}
+        <div className="absolute bottom-5 right-5 z-20 flex flex-col items-end gap-2">
+          {/* Expanded FAB Menu Items */}
+          {isFabOpen && (
+            <div className="flex flex-col gap-2 mb-1 animate-in slide-in-from-bottom-3 duration-200">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  if (onOpenBarcodeScanner) onOpenBarcodeScanner();
+                }}
+                className="px-3 py-2 rounded-2xl bg-zinc-900/95 border border-amber-500/50 text-amber-300 font-bold text-xs flex items-center gap-2 shadow-xl hover:bg-zinc-800 transition-all"
+              >
+                <QrCode size={16} className="text-amber-400" />
+                <span>Barcode scannen</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  if (onOpenMealVision) onOpenMealVision();
+                }}
+                className="px-3 py-2 rounded-2xl bg-zinc-900/95 border border-orange-500/50 text-orange-300 font-bold text-xs flex items-center gap-2 shadow-xl hover:bg-zinc-800 transition-all"
+              >
+                <Camera size={16} className="text-orange-400" />
+                <span>Foto-Scan (Vision)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFabOpen(false);
+                  const searchEl = document.querySelector("input[placeholder*='Mahlzeit suchen']");
+                  if (searchEl) searchEl.focus();
+                }}
+                className="px-3 py-2 rounded-2xl bg-zinc-900/95 border border-sky-500/50 text-sky-300 font-bold text-xs flex items-center gap-2 shadow-xl hover:bg-zinc-800 transition-all"
+              >
+                <Search size={16} className="text-sky-400" />
+                <span>Mahlzeit suchen</span>
+              </button>
+            </div>
           )}
+
+          {/* Main Neon Cyan FAB Button */}
+          <button
+            type="button"
+            onClick={() => setIsFabOpen(prev => !prev)}
+            className={`w-13 h-13 rounded-2xl bg-sky-400 hover:bg-sky-300 text-black flex items-center justify-center shadow-lg shadow-sky-500/40 active:scale-90 transition-all ${
+              isFabOpen ? 'rotate-45 bg-zinc-800 text-white border border-zinc-700' : ''
+            }`}
+            title="Mahlzeit / Scan hinzufügen"
+          >
+            <Plus size={24} className="stroke-[2.5]" />
+          </button>
         </div>
 
       </div>
