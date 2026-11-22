@@ -1,7 +1,74 @@
-// Calorie & Micronutrient Food Database (Yazio / MyFitnessPal Style + Deep Nutrition)
-// Contains common meals, raw whole foods, ancestral foods and junk/fast foods.
+// Calorie & Micronutrient Food Database (Yazio / MyFitnessPal Style + Deep Nutrition + FDDB Live Proxy)
+const https = require('https');
 
 const FOOD_DATABASE = [
+  // Eier & Eierspeisen (Erweitert)
+  {
+    id: 'ei-mittelgross',
+    name: 'Ei, vom Huhn (Naturprodukt)',
+    aliases: ['ei', 'eier', 'hühnerei', 'egg', 'frische eier'],
+    serving: '1 mittelgroßes Ei (ca. 55g)',
+    calories: 86,
+    protein: 7.2,
+    fat: 6.2,
+    carbs: 0.6,
+    micros: { cholin: '140 mg', retinol: '160 mcg', zink: '1.0 mg', lutein: '400 mcg', vitaminB12: '1.1 mcg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'eier-weidebutter',
+    name: '3 Rühreier / Spiegeleier in Bio-Butter',
+    aliases: ['eier', 'rührei', 'spiegelei', '3 eier', 'ruehrei'],
+    serving: '3 große Eier (180g) + 15g Butter',
+    calories: 340,
+    protein: 21,
+    fat: 28,
+    carbs: 1.5,
+    micros: { cholin: '420 mg', retinol: '480 mcg', zink: '3.1 mg', lutein: '1200 mcg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'eiklar-eiweiss',
+    name: 'Eiklar / Eiweiß (flüssig)',
+    aliases: ['eiklar', 'eiweiss', 'eiweiß', 'egg whites'],
+    serving: '100g (ca. 3 Eiklar)',
+    calories: 48,
+    protein: 11.0,
+    fat: 0.2,
+    carbs: 0.7,
+    micros: { kalium: '160 mg', natrium: '170 mg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'eigelb-dotter',
+    name: 'Eigelb / Dotter',
+    aliases: ['eigelb', 'dotter', 'egg yolk'],
+    serving: '1 Eigelb (ca. 18g)',
+    calories: 55,
+    protein: 2.7,
+    fat: 4.5,
+    carbs: 0.6,
+    micros: { cholin: '120 mg', retinol: '130 mcg', vitaminD: '1.1 mcg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'bio-eier-packung',
+    name: 'Bio-Eier (Freilandhaltung Kl. A)',
+    aliases: ['bio eier', 'freilandeier', 'eier aldi', 'eier lidl', 'eier rewe'],
+    serving: '100g',
+    calories: 153,
+    protein: 13.0,
+    fat: 11.0,
+    carbs: 0.6,
+    micros: { cholin: '290 mg', retinol: '320 mcg', zink: '1.8 mg', vitaminB12: '2.0 mcg' },
+    isClean: true,
+    warning: null
+  },
+
   // Steaks & Rindfleisch-Variationen
   {
     id: 'steak-butter',
@@ -136,17 +203,17 @@ const FOOD_DATABASE = [
     warning: null
   },
 
-  // Ancestral & Clean Whole Foods
+  // Ancestral, Obst & Whole Foods
   {
-    id: 'eier-weidebutter',
-    name: '3 Rühreier / Spiegeleier in Bio-Butter',
-    aliases: ['eier', 'rührei', 'spiegelei', '3 eier'],
-    serving: '3 große Eier (180g) + 15g Butter',
-    calories: 340,
-    protein: 21,
-    fat: 28,
-    carbs: 1.5,
-    micros: { cholin: '420 mg', retinol: '480 mcg', zink: '3.1 mg', lutein: '1200 mcg' },
+    id: 'mango-chunks',
+    name: 'Mango Chunks (Gefroren / Frisch)',
+    aliases: ['mango', 'mangos', 'mango chunks', 'mango lidl'],
+    serving: '160g Portion',
+    calories: 105,
+    protein: 0.8,
+    fat: 0.8,
+    carbs: 22.7,
+    micros: { vitaminC: '58 mg', vitaminA: '180 mcg', kalium: '260 mg' },
     isClean: true,
     warning: null
   },
@@ -204,14 +271,115 @@ const FOOD_DATABASE = [
   }
 ];
 
-// Search foods by text query or barcode name
-function searchFoodDatabase(query) {
+// Live FDDB Scraper Query (Fetches live catalog items from fddb.mobi)
+function fetchFddbFoods(query) {
+  return new Promise((resolve) => {
+    if (!query || query.trim().length < 2) return resolve([]);
+    
+    const url = `https://fddb.mobi/search/?lang=de&cat=mobile-de&search=${encodeURIComponent(query.trim())}`;
+    const options = {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.91 Mobile Safari/537.36'
+      },
+      timeout: 3500
+    };
+
+    const req = https.get(url, options, (res) => {
+      if (res.statusCode !== 200) {
+        return resolve([]);
+      }
+      let html = '';
+      res.on('data', chunk => { html += chunk; });
+      res.on('end', () => {
+        try {
+          const items = [];
+          const parts = html.split("<li class='fddb-m-result'>");
+          for (let i = 1; i < parts.length && items.length < 15; i++) {
+            const chunk = parts[i];
+            const nameMatch = chunk.match(/<span class='fddb-m-result__name'>([^<]+)<\/span>/);
+            const prodMatch = chunk.match(/<span class='fddb-m-result__producer'>([^<]+)<\/span>/);
+            const thumbMatch = chunk.match(/<img[^>]*src='([^']+)'/);
+            
+            // Extract servings & macro lines
+            const servingMatches = [...chunk.matchAll(/<span class='fddb-m-result__stats'>([^<]+<strong>(\d+)\s*kcal<\/strong>[^<]+)<\/span>/g)];
+            
+            let defaultCalories = 100;
+            let defaultFat = 0;
+            let defaultCarbs = 0;
+            let defaultServing = '100g';
+
+            if (servingMatches.length > 0) {
+              const firstRaw = servingMatches[0][1];
+              const cleanLine = firstRaw.replace(/&middot;/g, '•').replace(/&szlig;/g, 'ß').replace(/<strong>|<\/strong>/g, '').trim();
+              defaultServing = cleanLine.split(':')[0] || '100g';
+              
+              const calM = cleanLine.match(/(\d+)\s*kcal/);
+              if (calM) defaultCalories = parseInt(calM[1], 10);
+              
+              const fatM = cleanLine.match(/Fett:\s*([\d,]+)\s*g/);
+              if (fatM) defaultFat = parseFloat(fatM[1].replace(',', '.'));
+              
+              const carbM = cleanLine.match(/KH:\s*([\d,]+)\s*g/);
+              if (carbM) defaultCarbs = parseFloat(carbM[1].replace(',', '.'));
+            }
+
+            if (nameMatch) {
+              const prodName = prodMatch ? `${prodMatch[1]} - ${nameMatch[1]}` : nameMatch[1];
+              items.push({
+                id: 'fddb_' + i + '_' + Date.now(),
+                name: prodName,
+                serving: defaultServing,
+                calories: defaultCalories,
+                protein: Math.round(((defaultCalories - (defaultFat * 9) - (defaultCarbs * 4)) / 4) * 10) / 10 || 5,
+                fat: defaultFat,
+                carbs: defaultCarbs,
+                image: thumbMatch ? thumbMatch[1] : null,
+                isClean: true,
+                source: 'FDDB'
+              });
+            }
+          }
+          resolve(items);
+        } catch (err) {
+          resolve([]);
+        }
+      });
+    });
+
+    req.on('error', () => resolve([]));
+    req.on('timeout', () => { req.destroy(); resolve([]); });
+  });
+}
+
+// Search foods combining curated primal database + FDDB live results
+async function searchFoodDatabase(query) {
   if (!query || query.trim().length === 0) return [];
   const q = query.toLowerCase().trim();
-  return FOOD_DATABASE.filter(f => 
+  
+  // 1. Local Curated Primal Results
+  const localMatches = FOOD_DATABASE.filter(f => 
     f.name.toLowerCase().includes(q) || 
     f.aliases.some(alias => alias.includes(q))
   );
+
+  // 2. Fetch FDDB Live Results
+  let fddbMatches = [];
+  try {
+    fddbMatches = await fetchFddbFoods(query);
+  } catch(e) {}
+
+  // Filter out any duplicates and return combined list
+  const seen = new Set(localMatches.map(m => m.name.toLowerCase()));
+  const combined = [...localMatches];
+
+  for (const item of fddbMatches) {
+    if (!seen.has(item.name.toLowerCase())) {
+      combined.push(item);
+      seen.add(item.name.toLowerCase());
+    }
+  }
+
+  return combined;
 }
 
 module.exports = {

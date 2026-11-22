@@ -46,6 +46,17 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     if (scanMode === 'camera' && isOpen && typeof window !== 'undefined') {
       const startScanner = async () => {
         try {
+          // Explicitly prompt user media first to trigger WebView / Browser permission popup reliably
+          if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            try {
+              const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+              // release temp stream before html5-qrcode attaches
+              stream.getTracks().forEach(track => track.stop());
+            } catch(permErr) {
+              console.warn("User media prompt rejected:", permErr);
+            }
+          }
+
           const { Html5Qrcode } = await import('html5-qrcode');
           const element = document.getElementById("aura-barcode-reader");
           if (!element) return;
