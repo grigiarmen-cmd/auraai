@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { getApiBaseUrl } from '../../services/apiConfig';
+const API_BASE = getApiBaseUrl();
 import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink } from 'lucide-react';
 
 export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStore }) {
@@ -19,7 +21,7 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     setProductData(null);
 
     try {
-      const res = await fetch(`http://localhost:3001/api/nutrition/barcode/${encodeURIComponent(code)}`);
+      const res = await fetch(`${API_BASE}/api/nutrition/barcode/${encodeURIComponent(code)}`);
       if (!res.ok) {
         throw new Error('Produkt konnte nicht gefunden werden oder Barcode ist ungültig.');
       }

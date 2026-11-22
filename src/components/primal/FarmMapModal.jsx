@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '../../services/apiConfig';
+const API_BASE = getApiBaseUrl();
 import { MapPin, Navigation, ShoppingBag, Store, Sparkles, X, ExternalLink, CheckCircle } from 'lucide-react';
 
 export default function FarmMapModal({ isOpen, onClose, initialQuery }) {
@@ -31,7 +33,7 @@ export default function FarmMapModal({ isOpen, onClose, initialQuery }) {
   const fetchLocations = async (lat, lon) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`http://localhost:3001/api/locations/nearby?lat=${lat}&lon=${lon}&radius=6000`);
+      const res = await fetch(`${API_BASE}/api/locations/nearby?lat=${lat}&lon=${lon}&radius=6000`);
       if (res.ok) {
         const data = await res.json();
         setLocations(data);

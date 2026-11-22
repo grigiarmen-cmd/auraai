@@ -1393,6 +1393,10 @@ app.post('/api/auth/verify-code', (req, res) => {
   }
 });
 
-app.listen(3001, () => {
-  console.log("🚀 Aura AI Backend Server mit Standort & Notion läuft auf Port 3001");
-});
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(3001, () => {
+    console.log("🚀 Aura AI Backend Server mit Standort & Notion läuft auf Port 3001");
+  });
+}
+
+module.exports = app;

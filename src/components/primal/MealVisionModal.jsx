@@ -1,4 +1,6 @@
 import React, { useState, useRef } from 'react';
+import { getApiBaseUrl } from '../../services/apiConfig';
+const API_BASE = getApiBaseUrl();
 import { Camera, Upload, Sparkles, AlertTriangle, ShieldCheck, Flame, X, ChevronRight, Check } from 'lucide-react';
 
 export default function MealVisionModal({ isOpen, onClose, onSaveToNotion }) {
@@ -35,7 +37,7 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion }) {
     setAnalysisResult(null);
 
     try {
-      const res = await fetch('http://localhost:3001/api/nutrition/analyze-meal', {
+      const res = await fetch(`${API_BASE}/api/nutrition/analyze-meal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

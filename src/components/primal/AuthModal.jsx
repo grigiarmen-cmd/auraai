@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, KeyRound, CheckCircle2, Shield, HeartPulse, Activity, Sparkles, X, ArrowRight, Loader2, Dumbbell, Home, Plus, Trash2 } from 'lucide-react';
 
+import { getApiBaseUrl } from '../../services/apiConfig';
+const API_BASE = getApiBaseUrl();
 const ALL_SPORTS = [
   { id: 'weightlifting', name: '🏋️ Krafttraining / Gym', met: 5.5 },
   { id: 'heavy_powerlifting', name: '🏋️‍♂️ Powerlifting / Schweres Heben', met: 6.5 },
@@ -67,7 +69,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/send-code', {
+      const res = await fetch(`${API_BASE}/api/auth/send-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() })
@@ -91,7 +93,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('http://localhost:3001/api/auth/verify-code', {
+      const res = await fetch(`${API_BASE}/api/auth/verify-code`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), code: pin.trim() })

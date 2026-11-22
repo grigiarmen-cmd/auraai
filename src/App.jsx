@@ -56,6 +56,8 @@ import MealVisionModal from './components/primal/MealVisionModal';
 import FarmMapModal from './components/primal/FarmMapModal';
 import AuthModal from './components/primal/AuthModal';
 
+import { getApiBaseUrl } from './services/apiConfig';
+const API_BASE = getApiBaseUrl();
 const MODELS = [
   { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash', badge: 'Active' },
   { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', badge: 'Smart' },
@@ -190,7 +192,7 @@ export default function App() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('http://localhost:3001/api/system-stats');
+        const res = await fetch(`${API_BASE}/api/system-stats`);
         if (res.ok) {
           const data = await res.json();
           setSysStats(data);
@@ -288,7 +290,7 @@ export default function App() {
     if (!ghostText.trim()) return;
     setGhostLoading(true);
     try {
-      const res = await fetch('http://localhost:3001/api/ghostwrite', {
+      const res = await fetch(`${API_BASE}/api/ghostwrite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: ghostText, mode })
@@ -310,7 +312,7 @@ export default function App() {
     reader.onload = async (e) => {
       const base64 = e.target.result;
       try {
-        const res = await fetch('http://localhost:3001/api/parse-document', {
+        const res = await fetch(`${API_BASE}/api/parse-document`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileName: file.name, fileBase64: base64 })
@@ -415,7 +417,7 @@ export default function App() {
 
   const fetchNotionPages = async () => {
     try {
-      const res = await fetch('http://localhost:3001/api/notion/pages');
+      const res = await fetch(`${API_BASE}/api/notion/pages`);
       const data = await res.json();
       if (data.pages) setNotionPages(data.pages);
     } catch(e) {}
@@ -425,7 +427,7 @@ export default function App() {
     setLoadingNotion(true);
     const targetId = dbId || selectedPage.id;
     try {
-      const res = await fetch(`http://localhost:3001/api/notion/products?dbId=${targetId}`);
+      const res = await fetch(`${API_BASE}/api/notion/products?dbId=${targetId}`);
       const data = await res.json();
       if (data.products) setNotionProducts(data.products);
     } catch(e) {} finally {
@@ -501,7 +503,7 @@ export default function App() {
         text: m.text
       }));
 
-      const res = await fetch('http://localhost:3001/api/chat', {
+      const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: enrichedText, image: imageToSend, history: history })
