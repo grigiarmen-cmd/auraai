@@ -31,7 +31,7 @@ function getCodeForWindow(email, windowOffset = 0) {
 
 function verifyEmailCode(email, inputCode) {
   const code = (inputCode || '').trim();
-  if (code === '123456') return true;
+  if (!code) return false;
 
   // Check current window and previous window (to allow codes sent up to 15-30 min ago)
   const currentWindowCode = getCodeForWindow(email, 0);
