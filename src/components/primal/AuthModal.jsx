@@ -176,7 +176,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setMessage(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/send-code`, {
+      const res = await fetch(`${API_BASE}/api/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim() })
@@ -203,10 +203,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setError(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/verify-code`, {
+      const res = await fetch(`${API_BASE}/api/auth`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), code: pin.trim() })
+        body: JSON.stringify({ action: 'verify', email: email.trim(), code: pin.trim() })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ungültiger oder abgelaufener Code');

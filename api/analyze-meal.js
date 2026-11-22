@@ -1,4 +1,4 @@
-const geminiPool = require('../../src/services/geminiPool');
+const geminiPool = require('../src/services/geminiPool');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');

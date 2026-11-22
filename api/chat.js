@@ -1,6 +1,6 @@
 const groqManager = require('../src/services/groqService');
 const geminiPool = require('../src/services/geminiPool');
-const { resolveActions } = require('./actionResolver');
+const { resolveActions } = require('../src/services/actionResolver');
 
 module.exports = async (req, res) => {
   // CORS Headers
