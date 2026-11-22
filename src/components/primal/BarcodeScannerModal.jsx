@@ -40,6 +40,9 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     }
   };
 
+  // Consecutive read stabilization state
+  const scanBufferRef = useRef({ lastCode: null, count: 0 });
+
   // Safe Camera Lifecycle (Loads dynamically only in browser when user clicks Camera tab)
   useEffect(() => {
     let html5QrCode = null;
@@ -47,22 +50,40 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     if (scanMode === 'camera' && isOpen && typeof window !== 'undefined') {
       const startScanner = async () => {
         try {
+          scanBufferRef.current = { lastCode: null, count: 0 };
+
           // Explicitly prompt user media first to trigger WebView / Browser permission popup reliably
           if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
             try {
-              const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-              // release temp stream before html5-qrcode attaches
+              const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                  facingMode: 'environment',
+                  width: { ideal: 1280 },
+                  height: { ideal: 720 }
+                } 
+              });
               stream.getTracks().forEach(track => track.stop());
             } catch(permErr) {
               console.warn("User media prompt rejected:", permErr);
             }
           }
 
-          const { Html5Qrcode } = await import('html5-qrcode');
+          const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
           const element = document.getElementById("aura-barcode-reader");
           if (!element) return;
 
-          html5QrCode = new Html5Qrcode("aura-barcode-reader");
+          // Focus exclusively on retail linear 1D barcodes for ultra-high optical accuracy
+          html5QrCode = new Html5Qrcode("aura-barcode-reader", {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.EAN_13,
+              Html5QrcodeSupportedFormats.EAN_8,
+              Html5QrcodeSupportedFormats.UPC_A,
+              Html5QrcodeSupportedFormats.UPC_E,
+              Html5QrcodeSupportedFormats.CODE_128,
+              Html5QrcodeSupportedFormats.QR_CODE
+            ],
+            verbose: false
+          });
           scannerRef.current = html5QrCode;
           setIsCameraActive(true);
           setCameraError(null);
@@ -70,11 +91,23 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
           await html5QrCode.start(
             { facingMode: "environment" },
             {
-              fps: 15,
-              qrbox: { width: 260, height: 160 }
+              fps: 20,
+              qrbox: { width: 280, height: 150 },
+              aspectRatio: 1.777778
             },
             (decodedText) => {
-              console.log("Barcode scanned by camera:", decodedText);
+              // Debounce & Stabilization: Requires 2 identical consecutive frames to prevent single-frame noise glitches
+              if (scanBufferRef.current.lastCode === decodedText) {
+                scanBufferRef.current.count += 1;
+              } else {
+                scanBufferRef.current = { lastCode: decodedText, count: 1 };
+                return;
+              }
+
+              if (scanBufferRef.current.count < 2) return;
+
+              console.log("Verified barcode scanned by camera:", decodedText);
+
               // Haptic feedback & Audio feedback
               try {
                 if (navigator.vibrate) navigator.vibrate([40, 30, 40]);
