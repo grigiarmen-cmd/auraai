@@ -563,7 +563,7 @@ app.get('/api/notion/products', (req, res) => {
 });
 
 // Neue Notion Seite erstellen
-function createNewNotionPage(title, content) {
+function createNewNotionPage(title, content, token) {
   return new Promise((resolve) => {
     const payload = JSON.stringify({
       parent: { page_id: "41c6c80d-4897-8020-90e9-e341b6f5a0a6" },
@@ -586,7 +586,7 @@ function createNewNotionPage(title, content) {
       path: '/v1/pages',
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NOTION_TOKEN}`,
+        'Authorization': `Bearer ${token || NOTION_TOKEN}`,
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload)
@@ -614,9 +614,10 @@ function createNewNotionPage(title, content) {
 }
 
 // In Notion Seite oder Database eintragen
-function addProductToNotion(productName, price, primalRating, url, vorteile, targetDbId) {
+function addProductToNotion(productName, price, primalRating, url, vorteile, targetDbId, token) {
   return new Promise((resolve) => {
     const dbId = targetDbId || DEFAULT_NOTION_DB_ID;
+    const activeToken = token || NOTION_TOKEN;
     const payload = JSON.stringify({
       parent: { database_id: dbId },
       properties: {
@@ -643,7 +644,7 @@ function addProductToNotion(productName, price, primalRating, url, vorteile, tar
       path: '/v1/pages',
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${NOTION_TOKEN}`,
+        'Authorization': `Bearer ${activeToken}`,
         'Notion-Version': '2022-06-28',
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(payload)
@@ -789,7 +790,9 @@ async function openApp(appName, query) {
 
 // API Chat Route
 app.post('/api/chat', async (req, res) => {
-  const { message, image, history } = req.body;
+  const { message, image, history, userNotionToken, userNotionDbId } = req.body;
+  const activeNotionToken = userNotionToken || NOTION_TOKEN;
+  const activeNotionDbId = userNotionDbId || DEFAULT_NOTION_DB_ID;
   console.log("💬 User:", message, image ? "(mit Bild-Anhang)" : "");
 
   try {
@@ -988,10 +991,11 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
     }
 
     if (reply.includes('[ACTION:CREATE_NOTION_PAGE:')) {
-      const match = reply.match(/\[ACTION:CREATE_NOTION_PAGE:(.*?):(.*?)\]/);
+      const match = reply.match(/\[ACTION:CREATE_NOTION_PAGE:(.*?)(?::([\s\S]*?))?\]/);
       if (match) {
-        const [_, title, content] = match;
-        actionExecuted = await createNewNotionPage(title.trim(), content.trim());
+        const title = match[1] ? match[1].trim() : 'Neuer Plan';
+        const content = match[2] ? match[2].trim() : '';
+        actionExecuted = await createNewNotionPage(title, content, activeNotionToken);
         reply = reply.replace(match[0], '').trim();
       }
     }
@@ -1028,11 +1032,13 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
             searchResult.price,
             searchResult.primalRating,
             searchResult.url,
-            searchResult.vorteile
+            searchResult.vorteile,
+            activeNotionDbId,
+            activeNotionToken
           );
           results.push(insertResult.message);
         } else {
-          const insertResult = await addProductToNotion(query, "", "10 / 10", null, "");
+          const insertResult = await addProductToNotion(query, "", "10 / 10", null, "", activeNotionDbId, activeNotionToken);
           results.push(insertResult.message);
         }
         reply = reply.replace(sm[0], '').trim();

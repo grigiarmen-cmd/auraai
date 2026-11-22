@@ -521,7 +521,13 @@ export default function App() {
       const res = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: enrichedText, image: imageToSend, history: history })
+        body: JSON.stringify({ 
+          message: enrichedText, 
+          image: imageToSend, 
+          history: history,
+          userNotionToken: userProfile?.notionToken || localStorage.getItem('aura_custom_notion_token') || '',
+          userNotionDbId: userProfile?.notionDbId || localStorage.getItem('aura_custom_notion_db') || ''
+        })
       });
       const data = await res.json();
 

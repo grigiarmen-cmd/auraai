@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, KeyRound, CheckCircle2, Shield, HeartPulse, Activity, Sparkles, X, ArrowRight, Loader2, Dumbbell, Home, Plus, Trash2 } from 'lucide-react';
+import { Mail, KeyRound, CheckCircle2, Shield, HeartPulse, Activity, Sparkles, X, ArrowRight, Loader2, Dumbbell, Home, Plus, Trash2, BookOpen, ExternalLink } from 'lucide-react';
 
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
@@ -58,6 +58,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     { choreId: 'house_cleaning', hoursPerWeek: 3 },
     { choreId: 'dishwashing', hoursPerWeek: 2 }
   ]);
+
+  // Optional Notion Token for Custom Second-Brain
+  const [userNotionToken, setUserNotionToken] = useState(() => {
+    try { return localStorage.getItem('aura_custom_notion_token') || ''; } catch(e) { return ''; }
+  });
+  const [userNotionDbId, setUserNotionDbId] = useState(() => {
+    try { return localStorage.getItem('aura_custom_notion_db') || ''; } catch(e) { return ''; }
+  });
 
   if (!isOpen) return null;
 
@@ -181,8 +189,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       pal,
       targetCalories,
       goal,
-      conditions: conditions.trim()
+      conditions: conditions.trim(),
+      notionToken: userNotionToken.trim(),
+      notionDbId: userNotionDbId.trim()
     };
+    if (userNotionToken.trim()) {
+      localStorage.setItem('aura_custom_notion_token', userNotionToken.trim());
+    }
+    if (userNotionDbId.trim()) {
+      localStorage.setItem('aura_custom_notion_db', userNotionDbId.trim());
+    }
     localStorage.setItem('aura_user_profile', JSON.stringify(profile));
     if (onAuthSuccess) onAuthSuccess(profile);
     onClose();
@@ -467,6 +483,42 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
                 onChange={(e) => setConditions(e.target.value)}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
               />
+            </div>
+
+            {/* 6. Optionales Notion Second-Brain (Eigener Token oder Integrierter Speicher) */}
+            <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-indigo-400 flex items-center gap-1.5">
+                  <BookOpen size={14} /> Optional: Eigenes Notion Second-Brain verbinden
+                </span>
+                <a
+                  href="https://www.notion.so/profile/integrations"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[11px] text-zinc-400 hover:text-indigo-300 underline flex items-center gap-1"
+                >
+                  Token erstellen <ExternalLink size={10} />
+                </a>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-relaxed">
+                Standardmäßig nutzt Aura den integrierten Speicher. Wenn du deine Pläne & Einkaufslisten in dein eigenes Notion schreiben willst, trage hier deinen Token ein:
+              </p>
+              <div className="space-y-1.5 pt-1">
+                <input
+                  type="password"
+                  placeholder="Notion Internal Integration Secret (secret_...)"
+                  value={userNotionToken}
+                  onChange={(e) => setUserNotionToken(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500 font-mono"
+                />
+                <input
+                  type="text"
+                  placeholder="Notion Page-ID oder Database-ID (optional)"
+                  value={userNotionDbId}
+                  onChange={(e) => setUserNotionDbId(e.target.value)}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-indigo-500 font-mono"
+                />
+              </div>
             </div>
 
             <button
