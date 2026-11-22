@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { Mail, KeyRound, CheckCircle2, Shield, HeartPulse, Activity, Sparkles, X, ArrowRight, Loader2, Dumbbell, Home, Plus, Trash2, BookOpen, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, KeyRound, Lock, CheckCircle2, Shield, HeartPulse, Activity, Sparkles, X, ArrowRight, Loader2, Dumbbell, Home, Plus, Trash2, BookOpen, ExternalLink, LogIn, UserPlus } from 'lucide-react';
 
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
+
 const ALL_SPORTS = [
   { id: 'weightlifting', name: '🏋️ Krafttraining / Gym', met: 5.5 },
   { id: 'heavy_powerlifting', name: '🏋️‍♂️ Powerlifting / Schweres Heben', met: 6.5 },
@@ -34,8 +35,12 @@ const DAILY_CHORES = [
 ];
 
 export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
-  const [step, setStep] = useState('email'); // 'email' | 'pin' | 'health_profile'
-  const [email, setEmail] = useState('');
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
+  const [step, setStep] = useState('auth'); // 'auth' | 'pin' | 'health_profile'
+  const [email, setEmail] = useState(() => {
+    try { return localStorage.getItem('aura_saved_email') || ''; } catch(e) { return ''; }
+  });
+  const [password, setPassword] = useState('');
   const [pin, setPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -78,15 +83,91 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     try { return localStorage.getItem('aura_explanation_depth') || 'viel'; } catch(e) { return 'viel'; }
   });
 
+  // Load existing profile from localStorage on open if available
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('aura_user_profile');
+      if (saved) {
+        const p = JSON.parse(saved);
+        if (p.email) setEmail(p.email);
+        if (p.weightKg) setWeightKg(p.weightKg.toString());
+        if (p.heightCm) setHeightCm(p.heightCm.toString());
+        if (p.age) setAge(p.age.toString());
+        if (p.gender) setGender(p.gender);
+        if (p.dailySteps) setDailySteps(p.dailySteps.toString());
+        if (p.goal) setGoal(p.goal);
+        if (p.conditions) setConditions(p.conditions);
+        if (p.explanationDepth) setExplanationDepth(p.explanationDepth);
+        if (p.customMacros?.calories) setCustomCalories(p.customMacros.calories.toString());
+        if (p.customMacros?.protein) setCustomProtein(p.customMacros.protein.toString());
+        if (p.customMacros?.fat) setCustomFat(p.customMacros.fat.toString());
+        if (p.customMacros?.carbs) setCustomCarbs(p.customMacros.carbs.toString());
+        if (p.selectedSports) setSelectedSports(p.selectedSports);
+        if (p.selectedChores) setSelectedChores(p.selectedChores);
+      }
+    } catch(e) {}
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
-  const handleSendCode = async () => {
+  // 1. Direct Cloud Login with Email + Password
+  const handleLogin = async () => {
     if (!email || !email.includes('@')) {
       setError('Bitte eine gültige E-Mail-Adresse eingeben.');
       return;
     }
+    if (!password || password.length < 6) {
+      setError('Bitte dein Passwort (mind. 6 Zeichen) eingeben.');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
+    setMessage(null);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim(), password: password.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Login fehlgeschlagen');
+
+      const profile = data.user?.profile || {};
+      profile.email = email.trim();
+
+      // Save to localStorage so user stays logged in across sessions
+      localStorage.setItem('aura_saved_email', email.trim());
+      localStorage.setItem('aura_user_profile', JSON.stringify(profile));
+      if (profile.explanationDepth) localStorage.setItem('aura_explanation_depth', profile.explanationDepth);
+      if (profile.notionToken) localStorage.setItem('aura_custom_notion_token', profile.notionToken);
+      if (profile.notionDbId) localStorage.setItem('aura_custom_notion_db', profile.notionDbId);
+
+      if (onAuthSuccess) onAuthSuccess(profile);
+      onClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 2. Start Registration / Verification (Send 6-digit Code to Email)
+  const handleStartRegister = async () => {
+    if (!email || !email.includes('@')) {
+      setError('Bitte eine gültige E-Mail-Adresse eingeben.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setError('Bitte erstelle ein Passwort mit mindestens 6 Zeichen.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setMessage(null);
+
     try {
       const res = await fetch(`${API_BASE}/api/auth/send-code`, {
         method: 'POST',
@@ -95,6 +176,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Fehler beim Senden des Codes');
+
       setMessage('6-stelliger PIN wurde an deine E-Mail gesendet!');
       setStep('pin');
     } catch (err) {
@@ -104,6 +186,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     }
   };
 
+  // 3. Verify Code
   const handleVerifyPin = async () => {
     if (!pin || pin.length < 6) {
       setError('Bitte den vollständigen 6-stelligen Code eingeben.');
@@ -111,6 +194,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     }
     setIsLoading(true);
     setError(null);
+
     try {
       const res = await fetch(`${API_BASE}/api/auth/verify-code`, {
         method: 'POST',
@@ -119,6 +203,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ungültiger oder abgelaufener Code');
+
       setStep('health_profile');
     } catch (err) {
       setError(err.message);
@@ -127,7 +212,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     }
   };
 
-  // Add a new sport
+  // Add / remove sports & chores
   const addSport = (sportId) => {
     if (!selectedSports.some(s => s.sportId === sportId)) {
       setSelectedSports([...selectedSports, { sportId, hoursPerWeek: 2 }]);
@@ -142,7 +227,6 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setSelectedSports(selectedSports.filter(s => s.sportId !== sportId));
   };
 
-  // Add a new chore
   const addChore = (choreId) => {
     if (!selectedChores.some(c => c.choreId === choreId)) {
       setSelectedChores([...selectedChores, { choreId, hoursPerWeek: 2 }]);
@@ -161,15 +245,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const w = Number(weightKg) || 80;
   const h = Number(heightCm) || 180;
   const a = Number(age) || 25;
-  const bmr = gender === 'male' 
+
+  const bmr = gender === 'male'
     ? Math.round(10 * w + 6.25 * h - 5 * a + 5)
     : Math.round(10 * w + 6.25 * h - 5 * a - 161);
 
-  // PAL expenditure
-  const stepsKcal = (Number(dailySteps) || 10000) * 0.04;
+  const stepsKcal = Math.round((Number(dailySteps) || 10000) * 0.04);
+
   const totalWeeklySportsKcal = selectedSports.reduce((acc, s) => {
     const sp = ALL_SPORTS.find(item => item.id === s.sportId);
-    const met = sp ? sp.met : 5.0;
+    const met = sp ? sp.met : 6.0;
     return acc + (met * w * s.hoursPerWeek);
   }, 0);
   const dailySportsKcal = totalWeeklySportsKcal / 7;
@@ -185,10 +270,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const targetCalories = goal === 'fat_loss' ? Math.round(tdee - 450) : goal === 'muscle_gain' ? Math.round(tdee + 350) : tdee;
   const pal = (tdee / bmr).toFixed(2);
 
-  const handleSaveProfile = () => {
+  // 4. Save Profile Globally to Notion Cloud Database & LocalStorage
+  const handleSaveProfile = async () => {
+    setIsLoading(true);
+    setError(null);
+
     const finalCalories = Number(customCalories) || targetCalories;
     const profile = {
-      email,
+      email: email.trim(),
       weightKg: w,
       heightCm: h,
       age: a,
@@ -212,33 +301,55 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       notionToken: userNotionToken.trim(),
       notionDbId: userNotionDbId.trim()
     };
-    localStorage.setItem('aura_explanation_depth', explanationDepth);
-    if (userNotionToken.trim()) {
-      localStorage.setItem('aura_custom_notion_token', userNotionToken.trim());
+
+    try {
+      // Save to global Cloud Database (Notion)
+      if (password) {
+        await fetch(`${API_BASE}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: email.trim(),
+            password: password.trim(),
+            profile
+          })
+        });
+      }
+
+      localStorage.setItem('aura_saved_email', email.trim());
+      localStorage.setItem('aura_explanation_depth', explanationDepth);
+      if (userNotionToken.trim()) localStorage.setItem('aura_custom_notion_token', userNotionToken.trim());
+      if (userNotionDbId.trim()) localStorage.setItem('aura_custom_notion_db', userNotionDbId.trim());
+      localStorage.setItem('aura_user_profile', JSON.stringify(profile));
+
+      if (onAuthSuccess) onAuthSuccess(profile);
+      onClose();
+    } catch(err) {
+      console.error(err);
+      // Still allow local completion
+      localStorage.setItem('aura_user_profile', JSON.stringify(profile));
+      if (onAuthSuccess) onAuthSuccess(profile);
+      onClose();
+    } finally {
+      setIsLoading(false);
     }
-    if (userNotionDbId.trim()) {
-      localStorage.setItem('aura_custom_notion_db', userNotionDbId.trim());
-    }
-    localStorage.setItem('aura_user_profile', JSON.stringify(profile));
-    if (onAuthSuccess) onAuthSuccess(profile);
-    onClose();
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-zinc-950/95 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh] p-6 space-y-5">
+      <div className="relative w-full max-w-xl bg-zinc-950 border border-zinc-800 rounded-3xl shadow-2xl p-6 overflow-hidden max-h-[92vh] overflow-y-auto space-y-5">
         
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+        <div className="flex items-center justify-between border-b border-zinc-800/80 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-blue-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
               <Shield size={20} />
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-wide flex items-center gap-1.5">
-                Aura Clinical & PAL Metabolism Engine <Sparkles size={14} className="text-indigo-400" />
+                Aura Global Account & Profil <Sparkles size={14} className="text-indigo-400" />
               </h2>
-              <p className="text-[11px] text-zinc-400">Millimetergenauer MET-Tracker & Diagnostik</p>
+              <p className="text-[11px] text-zinc-400">Überall weltweit einloggen (Cloud-Sync & Diagnostik)</p>
             </div>
           </div>
           <button 
@@ -261,52 +372,113 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
           </div>
         )}
 
-        {/* STEP 1: Email */}
-        {step === 'email' && (
+        {/* STEP 1: LOGIN oder REGISTRIEREN Toggle */}
+        {step === 'auth' && (
           <div className="space-y-4">
-            <p className="text-xs text-zinc-300">
-              Melde dich mit deiner E-Mail an, um deine Laborbefunde, Stoffwechselziele und Vorerkrankungen sicher zu synchronisieren:
-            </p>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-3.5 text-zinc-500" size={16} />
-              <input
-                type="email"
-                placeholder="deine.email@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
-              />
+            {/* Mode Switcher */}
+            <div className="flex bg-zinc-900/80 p-1 rounded-2xl border border-zinc-800">
+              <button
+                type="button"
+                onClick={() => { setAuthMode('login'); setError(null); setMessage(null); }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  authMode === 'login'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <LogIn size={14} /> Anmelden (Passwort)
+              </button>
+              <button
+                type="button"
+                onClick={() => { setAuthMode('register'); setError(null); setMessage(null); }}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  authMode === 'register'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <UserPlus size={14} /> Neu registrieren
+              </button>
             </div>
-            <button
-              onClick={handleSendCode}
-              disabled={isLoading}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
-            >
-              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>6-stelligen Code anfordern <ArrowRight size={14} /></>}
-            </button>
+
+            <p className="text-xs text-zinc-300">
+              {authMode === 'login'
+                ? 'Gib deine E-Mail und dein Passwort ein, um dein Profil auf jedem Gerät weltweit sofort abzurufen:'
+                : 'Erstelle deinen Account mit E-Mail und sicherem Passwort. Deine Diagnosen und Makros werden sicher in deiner Cloud gespeichert:'}
+            </p>
+
+            {/* Email Field */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-zinc-400 font-medium">E-Mail-Adresse</label>
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-3.5 text-zinc-500" size={16} />
+                <input
+                  type="email"
+                  placeholder="deine.email@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] text-zinc-400 font-medium">Passwort</label>
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-3.5 text-zinc-500" size={16} />
+                <input
+                  type="password"
+                  placeholder="Mindestens 6 Zeichen"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') authMode === 'login' ? handleLogin() : handleStartRegister(); }}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {authMode === 'login' ? (
+              <button
+                onClick={handleLogin}
+                disabled={isLoading}
+                className="w-full py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+              >
+                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>In Account einloggen <LogIn size={14} /></>}
+              </button>
+            ) : (
+              <button
+                onClick={handleStartRegister}
+                disabled={isLoading}
+                className="w-full py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-xs transition-all shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2"
+              >
+                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Account erstellen & Code anfordern <ArrowRight size={14} /></>}
+              </button>
+            )}
           </div>
         )}
 
-        {/* STEP 2: PIN */}
+        {/* STEP 2: PIN Verification (Only on new Registration) */}
         {step === 'pin' && (
           <div className="space-y-4">
             <p className="text-xs text-zinc-300">
-              Gib den 6-stelligen PIN ein, den wir an <span className="text-indigo-400 font-bold">{email}</span> gesendet haben:
+              Gib den 6-stelligen Sicherheitscode ein, den wir an <span className="text-indigo-400 font-bold">{email}</span> gesendet haben:
             </p>
             <div className="relative">
               <KeyRound className="absolute left-3.5 top-3.5 text-zinc-500" size={16} />
               <input
                 type="text"
                 maxLength={6}
-                placeholder="123456"
+                placeholder="6-stelliger Code"
                 value={pin}
                 onChange={(e) => setPin(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyPin(); }}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-3 text-lg font-mono tracking-widest text-white placeholder-zinc-600 text-center focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div className="flex gap-2">
               <button
-                onClick={() => setStep('email')}
+                onClick={() => setStep('auth')}
                 className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs"
               >
                 Zurück
@@ -316,123 +488,119 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
                 disabled={isLoading}
                 className="flex-1 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all flex items-center justify-center gap-2"
               >
-                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>Code bestätigen <CheckCircle2 size={14} /></>}
+                {isLoading ? <Loader2 size={16} className="animate-spin" /> : <>E-Mail bestätigen <CheckCircle2 size={14} /></>}
               </button>
             </div>
           </div>
         )}
 
-        {/* STEP 3: Körperdaten, Sportarten, Chores & Krankheiten */}
+        {/* STEP 3: Detailed Health, PAL & Metabolism Profile Configuration */}
         {step === 'health_profile' && (
-          <div className="space-y-4 overflow-y-auto pr-1">
-            
-            {/* Live Computed Metabolic Target Banner */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-r from-emerald-500/15 via-teal-500/10 to-transparent border border-emerald-500/30 flex items-center justify-between">
-              <div>
-                <span className="text-[10px] text-emerald-400 uppercase tracking-widest font-bold">Errechneter Stoffwechsel</span>
-                <div className="text-lg font-black text-white flex items-center gap-2">
-                  <span>{targetCalories} kcal / Tag</span>
-                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">PAL: {pal}</span>
-                </div>
-              </div>
-              <div className="text-right text-[11px] text-zinc-400">
-                <div>BMR: {bmr} kcal</div>
-                <div>Aktivität: +{Math.round(stepsKcal + dailySportsKcal + dailyChoresKcal)} kcal</div>
-              </div>
+          <div className="space-y-4">
+            <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between text-xs text-indigo-300">
+              <span>Account verifiziert: <b className="text-white">{email}</b></span>
+              <span className="text-[10px] bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-300">Cloud Sync aktiv</span>
             </div>
 
-            {/* 1. Body Measurements */}
-            <div className="grid grid-cols-4 gap-2 text-xs">
+            {/* 1. Basis Körperdaten */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <label className="text-zinc-400 text-[10px] block mb-1">Gewicht (kg)</label>
+                <label className="text-[11px] text-zinc-400 block mb-1">Gewicht (kg)</label>
                 <input
                   type="number"
                   value={weightKg}
                   onChange={(e) => setWeightKg(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 text-white"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-bold"
                 />
               </div>
               <div>
-                <label className="text-zinc-400 text-[10px] block mb-1">Größe (cm)</label>
+                <label className="text-[11px] text-zinc-400 block mb-1">Größe (cm)</label>
                 <input
                   type="number"
                   value={heightCm}
                   onChange={(e) => setHeightCm(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 text-white"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-bold"
                 />
               </div>
               <div>
-                <label className="text-zinc-400 text-[10px] block mb-1">Alter</label>
+                <label className="text-[11px] text-zinc-400 block mb-1">Alter</label>
                 <input
                   type="number"
                   value={age}
                   onChange={(e) => setAge(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2.5 py-2 text-white"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-bold"
                 />
               </div>
               <div>
-                <label className="text-zinc-400 text-[10px] block mb-1">Ziel</label>
+                <label className="text-[11px] text-zinc-400 block mb-1">Biologisches Geschlecht</label>
+                <select
+                  value={gender}
+                  onChange={(e) => setGender(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-semibold"
+                >
+                  <option value="male">Männlich</option>
+                  <option value="female">Weiblich</option>
+                </select>
+              </div>
+            </div>
+
+            {/* 2. Tägliche Schritte & Ziel */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div>
+                <label className="text-[11px] text-zinc-400 block mb-1">Tägliche Schritte</label>
+                <input
+                  type="number"
+                  step="500"
+                  value={dailySteps}
+                  onChange={(e) => setDailySteps(e.target.value)}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-bold"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] text-zinc-400 block mb-1">Stoffwechsel-Ziel</label>
                 <select
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-2 py-2 text-white text-[11px]"
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-indigo-500 font-semibold"
                 >
-                  <option value="recomposition">Recomp</option>
-                  <option value="fat_loss">Fettabbau</option>
-                  <option value="muscle_gain">Muskelaufbau</option>
+                  <option value="fat_loss">Fettverbrennung (-450 kcal)</option>
+                  <option value="recomposition">Body Recomposition / Erhalt</option>
+                  <option value="muscle_gain">Muskelaufbau (+350 kcal)</option>
                 </select>
               </div>
             </div>
 
-            {/* 2. Steps */}
-            <div>
-              <label className="text-zinc-400 text-[10px] block mb-1">Tägliche Schritte (NEAT)</label>
-              <input
-                type="number"
-                value={dailySteps}
-                onChange={(e) => setDailySteps(e.target.value)}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2 text-white text-xs"
-              />
-            </div>
-
-            {/* 3. Sportarten Auswählen & Std pro Woche */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-amber-400 font-bold flex items-center gap-1.5">
-                  <Dumbbell size={14} /> Sportarten auswählen:
+            {/* 3. Sportarten & MET */}
+            <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <Dumbbell size={14} className="text-amber-400" /> Sport & Training (Stunden pro Woche):
                 </span>
-                <select 
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      addSport(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] rounded-lg px-2 py-1"
+                <select
+                  onChange={(e) => { if (e.target.value) { addSport(e.target.value); e.target.value = ''; } }}
+                  className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] rounded-lg px-2 py-1"
                 >
-                  <option value="">+ Sportart hinzufügen...</option>
-                  {ALL_SPORTS.map(s => (
-                    <option key={s.id} value={s.id}>{s.name} (MET {s.met})</option>
-                  ))}
+                  <option value="">+ Sport hinzufügen</option>
+                  {ALL_SPORTS.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
-
-              <div className="space-y-1.5 max-h-28 overflow-y-auto">
+              <div className="space-y-1.5 pt-1">
                 {selectedSports.map(s => {
                   const sp = ALL_SPORTS.find(item => item.id === s.sportId);
                   return (
-                    <div key={s.sportId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs">
-                      <span className="text-white font-medium truncate max-w-[200px]">{sp?.name || s.sportId}</span>
+                    <div key={s.sportId} className="flex items-center justify-between bg-zinc-950/60 p-2 rounded-xl border border-zinc-800/80">
+                      <span className="text-zinc-300 font-medium">{sp ? sp.name : s.sportId}</span>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
-                          min="0.5"
+                          min="0"
+                          max="30"
                           step="0.5"
                           value={s.hoursPerWeek}
                           onChange={(e) => updateSportHours(s.sportId, e.target.value)}
-                          className="w-14 bg-zinc-950 border border-zinc-700 rounded px-2 py-0.5 text-center text-amber-300 font-bold"
+                          className="w-14 bg-zinc-900 border border-zinc-700 rounded-lg px-1.5 py-0.5 text-center text-amber-400 font-bold"
                         />
-                        <span className="text-zinc-400 text-[10px]">Std/Woche</span>
+                        <span className="text-[10px] text-zinc-500">h/Wo</span>
                         <button onClick={() => removeSport(s.sportId)} className="text-zinc-500 hover:text-rose-400">
                           <Trash2 size={13} />
                         </button>
@@ -443,44 +611,37 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
               </div>
             </div>
 
-            {/* 4. Hausarbeit & Alltags-METs */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-teal-400 font-bold flex items-center gap-1.5">
-                  <Home size={14} /> Hausarbeit & Alltag (Putzen, Spülen etc.):
+            {/* 4. Alltagsaktivitäten & Haushalt */}
+            <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-white flex items-center gap-1.5">
+                  <Home size={14} className="text-teal-400" /> Alltagsbewegung & Haushalt (Stunden pro Woche):
                 </span>
-                <select 
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      addChore(e.target.value);
-                      e.target.value = '';
-                    }
-                  }}
-                  className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] rounded-lg px-2 py-1"
+                <select
+                  onChange={(e) => { if (e.target.value) { addChore(e.target.value); e.target.value = ''; } }}
+                  className="bg-zinc-800 border border-zinc-700 text-zinc-200 text-[11px] rounded-lg px-2 py-1"
                 >
-                  <option value="">+ Hausarbeit hinzufügen...</option>
-                  {DAILY_CHORES.map(c => (
-                    <option key={c.id} value={c.id}>{c.name} (MET {c.met})</option>
-                  ))}
+                  <option value="">+ Aktivität hinzufügen</option>
+                  {DAILY_CHORES.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-
-              <div className="space-y-1.5 max-h-28 overflow-y-auto">
+              <div className="space-y-1.5 pt-1">
                 {selectedChores.map(c => {
                   const ch = DAILY_CHORES.find(item => item.id === c.choreId);
                   return (
-                    <div key={c.choreId} className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs">
-                      <span className="text-white font-medium truncate max-w-[200px]">{ch?.name || c.choreId}</span>
+                    <div key={c.choreId} className="flex items-center justify-between bg-zinc-950/60 p-2 rounded-xl border border-zinc-800/80">
+                      <span className="text-zinc-300 font-medium">{ch ? ch.name : c.choreId}</span>
                       <div className="flex items-center gap-2">
                         <input
                           type="number"
-                          min="0.5"
+                          min="0"
+                          max="40"
                           step="0.5"
                           value={c.hoursPerWeek}
                           onChange={(e) => updateChoreHours(c.choreId, e.target.value)}
-                          className="w-14 bg-zinc-950 border border-zinc-700 rounded px-2 py-0.5 text-center text-teal-300 font-bold"
+                          className="w-14 bg-zinc-900 border border-zinc-700 rounded-lg px-1.5 py-0.5 text-center text-teal-400 font-bold"
                         />
-                        <span className="text-zinc-400 text-[10px]">Std/Woche</span>
+                        <span className="text-[10px] text-zinc-500">h/Wo</span>
                         <button onClick={() => removeChore(c.choreId)} className="text-zinc-500 hover:text-rose-400">
                           <Trash2 size={13} />
                         </button>
@@ -491,9 +652,9 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
               </div>
             </div>
 
-            {/* 5. Krankheiten & Diagnosen */}
-            <div className="text-xs">
-              <label className="text-zinc-400 text-[10px] block mb-1 flex items-center gap-1">
+            {/* 5. Vorerkrankungen & Diagnosen */}
+            <div className="space-y-1 text-xs">
+              <label className="text-[11px] text-zinc-300 font-bold flex items-center gap-1.5">
                 <HeartPulse size={12} className="text-rose-400" /> Vorerkrankungen / Diagnosen (z.B. Diabetes, Insulinresistenz, Hashimoto):
               </label>
               <textarea
@@ -557,7 +718,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
               </div>
             </div>
 
-            {/* 6. Erklärungstiefe & Detailgrad der Antworten */}
+            {/* 7. Erklärungstiefe & Detailgrad der Antworten */}
             <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
               <span className="font-bold text-purple-400 flex items-center gap-1.5">
                 <Sparkles size={14} /> KI-Erklärungstiefe & Detailgrad:
@@ -590,7 +751,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
               </div>
             </div>
 
-            {/* 7. Optionales Notion Second-Brain (Eigener Token oder Integrierter Speicher) */}
+            {/* 8. Optionales Notion Second-Brain (Eigener Token oder Integrierter Speicher) */}
             <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-indigo-400 flex items-center gap-1.5">
@@ -628,9 +789,10 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
             <button
               onClick={handleSaveProfile}
+              disabled={isLoading}
               className="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
             >
-              <Activity size={16} /> Profil, PAL & Stoffwechsel aktivieren
+              {isLoading ? <Loader2 size={16} className="animate-spin" /> : <><Activity size={16} /> Profil in Cloud speichern & aktivieren</>}
             </button>
           </div>
         )}
