@@ -675,18 +675,27 @@ function addProductToNotion(productName, price, primalRating, url, vorteile, tar
   });
 }
 
-// Google Kalender: Direkte Eintragung über gcalendar CLI
+// Google Kalender: Direkte Eintragung über gcalendar CLI oder universeller Google Web-Intent
 function addGoogleCalendarEventDirectly(textPrompt) {
   return new Promise((resolve) => {
-    const cleanPrompt = textPrompt.replace(/"/g, '\\"');
-    exec(`gcalendar mutate quick-add "${cleanPrompt}"`, (error, stdout, stderr) => {
+    const encoded = encodeURIComponent(textPrompt.trim());
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encoded}&details=Erstellt+mit+Aura+AI`;
+
+    // Prüfen, ob wir auf dem lokalen Host mit verfügbarer gcalendar CLI laufen
+    exec(`gcalendar mutate quick-add "${textPrompt.replace(/"/g, '\\"')}"`, (error, stdout) => {
       if (!error && stdout) {
         console.log("gcalendar quick-add output:", stdout);
-        resolve(`Termin '${textPrompt}' direkt in deinen Google Kalender (grizzlygoegym@gmail.com) eingetragen! 📅`);
+        resolve({
+          message: `Termin '${textPrompt}' direkt in deinen Google Kalender eingetragen! 📅`,
+          url: googleCalendarUrl
+        });
       } else {
-        const encoded = encodeURIComponent(textPrompt);
-        exec(`start https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encoded}`);
-        resolve(`Termin '${textPrompt}' im Google Kalender vorbereitet und geöffnet!`);
+        // Universeller Fallback für APK, Mobile und Web
+        exec(`powershell -c "Start-Process '${googleCalendarUrl}'"`);
+        resolve({
+          message: `Termin '${textPrompt}' für deinen Google Kalender vorbereitet! 📅`,
+          url: googleCalendarUrl
+        });
       }
     });
   });
@@ -1004,7 +1013,11 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
       const match = reply.match(/\[ACTION:CALENDAR:(.*?)\]/);
       if (match) {
         const calText = match[1].trim();
-        actionExecuted = await addGoogleCalendarEventDirectly(calText);
+        const calRes = await addGoogleCalendarEventDirectly(calText);
+        actionExecuted = calRes.message || calRes;
+        if (calRes.url) {
+          openUrl = calRes.url;
+        }
         reply = reply.replace(match[0], '').trim();
       }
     }
