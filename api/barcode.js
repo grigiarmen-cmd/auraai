@@ -1,5 +1,6 @@
 const { fetchOpenFoodFacts, generateDeepScienceAnalysis } = require('../src/services/nutritionEngine');
 const { SEED_OILS, EMULSIFIERS_ADDITIVES } = require('../src/services/nutritionKnowledge');
+const geminiPool = require('../src/services/geminiPool');
 const https = require('https');
 
 // Helper to query FDDB mobile by barcode as a powerful fallback
@@ -70,6 +71,87 @@ function fetchFddbByBarcode(barcode) {
   });
 }
 
+// AI Amazon & Online EAN/ASIN Resolver
+async function fetchOnlineOrAmazonBarcode(code) {
+  try {
+    const apiKey = geminiPool.getCurrentKey();
+    if (!apiKey) return null;
+
+    const payload = JSON.stringify({
+      contents: [{
+        role: "user",
+        parts: [{
+          text: `Identifiziere das Lebensmittel oder Nahrungsergänzungsmittel mit dem Barcode / EAN / Amazon-Code: "${code}".
+Egal ob es von Amazon, einem Online-Shop (z.B. Raw Honey, Beef Jerky, Manuka, Bio-Ghee, Kollagen) oder aus dem Supermarkt stammt.
+Gib ein valides JSON mit exakt diesem Schema zurück:
+{
+  "product_name": "Exakter Name des Produkts (z.B. Raw Organic Blossom Honey)",
+  "brands": "Hersteller / Marke",
+  "ingredients_text": "Zutatenliste (z.B. 100% naturbelassener roher Blütenhonig, unpasteurisiert)",
+  "calories": 304,
+  "protein": 0.3,
+  "fat": 0.0,
+  "carbs": 82.0
+}
+NUR JSON zurückgeben.`
+        }]
+      }]
+    });
+
+    return new Promise((resolve) => {
+      const req = https.request({
+        hostname: "generativelanguage.googleapis.com",
+        path: `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
+        method: "POST",
+        rejectUnauthorized: false,
+        timeout: 5000,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(payload)
+        }
+      }, (res) => {
+        let body = '';
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => {
+          try {
+            const json = JSON.parse(body);
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (text) {
+              const match = text.match(/\{[\s\S]*\}/);
+              if (match) {
+                const parsed = JSON.parse(match[0]);
+                if (parsed.product_name) {
+                  return resolve({
+                    product_name: parsed.product_name,
+                    brands: parsed.brands || 'Online / Amazon Produkt',
+                    ingredients_text: parsed.ingredients_text || 'Reine Inhaltsstoffe (Online-Verifizierung)',
+                    nutriments: {
+                      'energy-kcal_100g': parsed.calories || 200,
+                      'proteins_100g': parsed.protein || 5,
+                      'fat_100g': parsed.fat || 5,
+                      'carbohydrates_100g': parsed.carbs || 15
+                    }
+                  });
+                }
+              }
+            }
+            resolve(null);
+          } catch(e) {
+            resolve(null);
+          }
+        });
+      });
+
+      req.on('error', () => resolve(null));
+      req.on('timeout', () => { req.destroy(); resolve(null); });
+      req.write(payload);
+      req.end();
+    });
+  } catch(e) {
+    return null;
+  }
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
@@ -87,10 +169,16 @@ module.exports = async (req, res) => {
     // 1. Try OpenFoodFacts
     let product = await fetchOpenFoodFacts(barcode);
 
-    // 2. Fallback: Query FDDB Live Database directly by barcode!
+    // 2. Fallback: Query FDDB Live Database directly by barcode
     if (!product) {
       console.log(`OpenFoodFacts miss for barcode ${barcode}, fallback to FDDB...`);
       product = await fetchFddbByBarcode(barcode);
+    }
+
+    // 3. Fallback: Query AI Engine for Amazon / Online EAN / ASIN Products!
+    if (!product) {
+      console.log(`FDDB miss for barcode ${barcode}, fallback to Online/Amazon AI resolver...`);
+      product = await fetchOnlineOrAmazonBarcode(barcode);
     }
 
     if (!product) {
