@@ -41,3 +41,6 @@ test-conn.py
 Thumbs.db
 test_tail.txt
 test_head.txt
+
+*.apk
+
