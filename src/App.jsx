@@ -60,6 +60,8 @@ import AuthModal from './components/primal/AuthModal';
 import CalorieTrackerModal from './components/primal/CalorieTrackerModal';
 import BloodWorkModal from './components/primal/BloodWorkModal';
 import CaffeineCircadianModal from './components/primal/CaffeineCircadianModal';
+import InChatFoodCard from './components/primal/InChatFoodCard';
+import InChatCameraScanner from './components/primal/InChatCameraScanner';
 
 import { getApiBaseUrl } from './services/apiConfig';
 const API_BASE = getApiBaseUrl();
@@ -105,6 +107,7 @@ export default function App() {
 
   // Aura Nutrition & Primal Modals
   const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
+  const [isInChatCameraOpen, setIsInChatCameraOpen] = useState(false);
   const [isMealVisionOpen, setIsMealVisionOpen] = useState(false);
   const [isFarmMapOpen, setIsFarmMapOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -530,6 +533,112 @@ export default function App() {
     fetchNotionProducts('41c6c80d-4897-80be-9350-f279e5b77f98');
   }, []);
 
+  const handleLogInChatMeal = (mealPayload) => {
+    try {
+      const todayKey = new Date().toISOString().split('T')[0];
+      const saved = localStorage.getItem(`aura_meals_${todayKey}`);
+      const list = saved ? JSON.parse(saved) : [];
+      list.unshift(mealPayload);
+      localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(list));
+      window.dispatchEvent(new Event('storage'));
+      window.dispatchEvent(new CustomEvent('aura_meals_updated', { detail: { dateKey: todayKey } }));
+
+      // Add feedback message in chat
+      const totalKcal = list.reduce((s, m) => s + (Number(m.calories) || 0), 0);
+      const targetKcal = 2200;
+      const remaining = Math.max(0, targetKcal - totalKcal);
+
+      const confirmMsg = {
+        role: 'assistant',
+        text: `✅ **${mealPayload.name}** (${mealPayload.amount || '100g'}) erfolgreich für **${mealPayload.category || 'Mahlzeit'}** eingetragen!\n\n🔥 **${mealPayload.calories} kcal** (${mealPayload.protein}g Protein | ${mealPayload.fat}g Fett | ${mealPayload.carbs}g KH)\n📊 **Tagesstatus:** ${totalKcal} / ${targetKcal} kcal gegessen • **${remaining} kcal übrig**.`,
+        workedTime: 'Logged to diary',
+        timestamp: 'just now'
+      };
+
+      setSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          return {
+            ...s,
+            messages: [...s.messages, confirmMsg]
+          };
+        }
+        return s;
+      }));
+    } catch (e) {
+      console.error('Error logging meal from in-chat card:', e);
+    }
+  };
+
+  const handleScanInChat = async (barcode) => {
+    if (!barcode) return;
+    setIsInChatCameraOpen(false);
+
+    // Show user message in chat
+    const userMsg = {
+      role: 'user',
+      text: `📷 Barcode gescannt: ${barcode}`,
+      timestamp: 'just now'
+    };
+
+    setSessions(prev => prev.map(s => {
+      if (s.id === activeSessionId) {
+        return {
+          ...s,
+          messages: [...s.messages, userMsg]
+        };
+      }
+      return s;
+    }));
+
+    setLoading(true);
+
+    try {
+      let res = await fetch(`${API_BASE}/api/nutrition/barcode/${encodeURIComponent(barcode)}`);
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/api/barcode?code=${encodeURIComponent(barcode)}`);
+      }
+      if (!res.ok) {
+        throw new Error('Produkt nicht gefunden');
+      }
+      const data = await res.json();
+
+      const assistantMsg = {
+        role: 'assistant',
+        text: `Ich habe das gescannte Produkt für dich analysiert: **${data.name || data.productName}**.\n\nHier sind die Nährwerte, der biochemische Aura Score und die zelluläre Wirkung. Bestätige einfach unten mit 1 Klick, um es direkt in dein Ernährungstagebuch einzutragen:`,
+        foodData: data,
+        workedTime: 'Analyzed food biochemics',
+        timestamp: 'just now'
+      };
+
+      setSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          return {
+            ...s,
+            messages: [...s.messages, assistantMsg]
+          };
+        }
+        return s;
+      }));
+    } catch (e) {
+      const errorMsg = {
+        role: 'assistant',
+        text: `⚠️ Produkt mit Barcode \`${barcode}\` konnte in der Nährstoff-Datenbank nicht aufgelöst werden. Du kannst den Produktnamen einfach direkt als Text eingeben!`,
+        timestamp: 'just now'
+      };
+      setSessions(prev => prev.map(s => {
+        if (s.id === activeSessionId) {
+          return {
+            ...s,
+            messages: [...s.messages, errorMsg]
+          };
+        }
+        return s;
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSend = async (customText) => {
     const textToSend = customText || input;
 
@@ -549,6 +658,14 @@ export default function App() {
 
     if ((!textToSend.trim() && !attachedImage && !attachedDocument) || loading) return;
 
+    // Direct Barcode Detector in chat prompt (e.g. user pasted/typed EAN 4061458013130 or 8-14 digits)
+    const trimmedInput = textToSend.trim();
+    if (/^\d{8,14}$/.test(trimmedInput) && !attachedImage && !attachedDocument) {
+      setInput('');
+      handleScanInChat(trimmedInput);
+      return;
+    }
+
     let enrichedText = textToSend;
     if (userProfile && userProfile.conditions) {
       enrichedText = `[PATIENTEN-KONTEXT: Gewicht: ${userProfile.weightKg}kg, Größe: ${userProfile.heightCm}cm, Schritte: ${userProfile.dailySteps}, Sport: ${userProfile.sportsHours}h/Woche, Bekannte Vorerkrankungen/Diagnosen: "${userProfile.conditions}"]\n${enrichedText}`;
@@ -562,6 +679,20 @@ export default function App() {
         enrichedText = `[AKTUELLER LABOR-STATUS: Vitalitäts-Score: ${b.overallScore}/100. Wichtige Werte: ${b.markers?.map(m => `${m.name}: ${m.value} (${m.status})`).slice(0, 4).join(', ')}]\n${enrichedText}`;
       }
       const todayK = new Date().toISOString().split('T')[0];
+      const savedMeals = localStorage.getItem(`aura_meals_${todayK}`);
+      if (savedMeals) {
+        try {
+          const mList = JSON.parse(savedMeals);
+          if (mList.length > 0) {
+            const totKcal = mList.reduce((s, m) => s + (Number(m.calories) || 0), 0);
+            const totProt = Math.round(mList.reduce((s, m) => s + (Number(m.protein) || 0), 0) * 10) / 10;
+            const totFat = Math.round(mList.reduce((s, m) => s + (Number(m.fat) || 0), 0) * 10) / 10;
+            const totCarbs = Math.round(mList.reduce((s, m) => s + (Number(m.carbs) || 0), 0) * 10) / 10;
+            const mealNames = mList.map(m => `${m.name} (${m.amount || '1 Portion'}, ${m.calories} kcal, ${m.category || 'Mahlzeit'})`).slice(0, 8).join('; ');
+            enrichedText = `[HEUTIGES ERNÄHRUNGSTAGEBUCH: Bisher ${totKcal} kcal gegessen (${totProt}g Protein, ${totFat}g Fett, ${totCarbs}g KH). Eingetragene Speisen: ${mealNames}]\n${enrichedText}`;
+          }
+        } catch(e) {}
+      }
       const savedCaff = localStorage.getItem(`aura_caffeine_${todayK}`);
       if (savedCaff) {
         const cList = JSON.parse(savedCaff);
@@ -1021,6 +1152,15 @@ export default function App() {
                         {renderFormattedText(msg.text)}
                       </div>
 
+                      {/* In-Chat Interactive Food & Barcode Card */}
+                      {msg.foodData && (
+                        <InChatFoodCard
+                          foodData={msg.foodData}
+                          onLogMeal={handleLogInChatMeal}
+                          onOpenTracker={() => setIsCalorieTrackerOpen(true)}
+                        />
+                      )}
+
                       {/* Generiertes KI Bild */}
                       {msg.imageUrl && (
                         <div className="relative group max-w-lg mt-2 rounded-xl overflow-hidden border border-[#232734] shadow-2xl bg-[#13151b]">
@@ -1301,6 +1441,16 @@ export default function App() {
                 >
                   <FileUp className="w-3.5 h-3.5" />
                 </label>
+
+                {/* In-Chat Barcode / Food Camera Trigger */}
+                <button
+                  type="button"
+                  onClick={() => setIsInChatCameraOpen(true)}
+                  className="p-1 rounded text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors"
+                  title="Barcode mit Kamera scannen"
+                >
+                  <QrCode className="w-3.5 h-3.5" />
+                </button>
 
                 {/* Model Selector Dropdown */}
                 <div className="relative" ref={dropdownRef}>
@@ -1805,6 +1955,12 @@ export default function App() {
       )}
 
       {/* Aura Nutrition & Primal Modals */}
+      <InChatCameraScanner
+        isOpen={isInChatCameraOpen}
+        onClose={() => setIsInChatCameraOpen(false)}
+        onDetectedCode={(code) => handleScanInChat(code)}
+      />
+
       <CalorieTrackerModal
         isOpen={isCalorieTrackerOpen}
         onClose={() => setIsCalorieTrackerOpen(false)}
