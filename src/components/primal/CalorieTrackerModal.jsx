@@ -33,11 +33,30 @@ export default function CalorieTrackerModal({
   // Active View Mode inside Tracker: 'dashboard' | 'foodscan_hub' | 'food_search_modal'
   const [activeSubView, setActiveSubView] = useState('dashboard');
 
+  // Edit meal modal / slide
+  const [editingMeal, setEditingMeal] = useState(null);
+
   // AI FoodScan Interactive State
   const [aiInputMode, setAiInputMode] = useState('text'); // 'text' | 'voice' | 'photo' | 'barcode'
   const [aiFoodText, setAiFoodText] = useState('');
   const [isAiListening, setIsAiListening] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
+
+  // Live Fasting Timer State
+  const [fastingSeconds, setFastingSeconds] = useState(55903); // starts around 15:31:43
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setFastingSeconds(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatFastingTime = (totalSec) => {
+    const hrs = Math.floor(totalSec / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+    return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Food Search Modal Tab: 'kürzlich' | 'gesucht' | 'favoriten'
   const [searchTab, setSearchTab] = useState('kürzlich');
@@ -338,9 +357,9 @@ export default function CalorieTrackerModal({
         {/* Circadian Fasting / Metabolic State Pill */}
         <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-gradient-to-r from-[#21193a] to-[#1c1833] border border-purple-900/40 text-xs shadow-md">
           <div className="flex items-center gap-2.5">
-            <Clock size={16} className="text-purple-300" />
+            <Clock size={16} className="text-purple-300 animate-pulse" />
             <span className="text-xs font-semibold text-purple-200">Fasten</span>
-            <span className="text-xs font-mono font-bold text-white tracking-wide">15:36:48</span>
+            <span className="text-xs font-mono font-bold text-white tracking-wide">{formatFastingTime(fastingSeconds)}</span>
           </div>
           <ChevronRight size={16} className="text-purple-400/80" />
         </div>
@@ -399,14 +418,14 @@ export default function CalorieTrackerModal({
                     />
                   </svg>
 
-                  {/* Centered Number inside Arc */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pt-3">
-                    <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
+                  {/* Centered Number inside Arc - aligned with left & right columns */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-start pt-2">
+                    <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight leading-none ${
                       caloriesRemaining < 0 ? 'text-rose-400' : 'text-white'
                     }`}>
                       {Math.max(0, caloriesRemaining)}
                     </span>
-                    <span className="text-[10px] text-zinc-400 font-medium">übrig</span>
+                    <span className="text-[11px] text-zinc-400 font-medium mt-1">übrig</span>
                   </div>
                 </div>
 
@@ -961,33 +980,42 @@ export default function CalorieTrackerModal({
                       meals.map((meal) => (
                         <div 
                           key={meal.id}
-                          className="px-3.5 py-2 flex items-center justify-between gap-3 text-xs hover:bg-zinc-900/30 transition-colors"
+                          onClick={() => setEditingMeal(meal)}
+                          className="px-3.5 py-2.5 flex items-center justify-between gap-3 text-xs hover:bg-zinc-800/40 cursor-pointer transition-colors group relative"
                         >
                           <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-7 h-7 rounded-lg bg-zinc-800/90 border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-[10px] font-bold shrink-0">
-                              <Utensils size={13} className="text-amber-400" />
+                            <div className="w-8 h-8 rounded-full bg-zinc-800/80 border border-zinc-700/60 flex items-center justify-center text-zinc-300 text-[11px] font-bold shrink-0">
+                              🍎
                             </div>
                             <div className="min-w-0">
-                              <span className="font-semibold text-white truncate block text-xs">{meal.name}</span>
-                              <div className="text-[10px] text-zinc-400 flex items-center gap-1.5">
+                              <span className="font-semibold text-white group-hover:text-sky-300 truncate block text-xs transition-colors">
+                                {meal.name}
+                              </span>
+                              <div className="text-[10px] text-zinc-400 flex items-center gap-1.5 mt-0.5">
                                 {meal.amount && <span>{meal.amount} •</span>}
-                                <span>{meal.fat || 0}g F</span>
+                                <span>{meal.fat || 0} g F</span>
                                 <span>•</span>
-                                <span>{meal.carbs || 0}g KH</span>
+                                <span>{meal.carbs || 0} g KH</span>
                                 <span>•</span>
-                                <span>{meal.protein || 0}g P</span>
-                                {meal.time && <span className="text-zinc-500">• {meal.time} Uhr</span>}
+                                <span>{meal.protein || 0} g P</span>
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="font-mono font-bold text-white text-xs">{meal.calories} kcal</span>
+                          <div className="flex items-center gap-3 shrink-0">
+                            <div className="text-right">
+                              <span className="font-mono font-bold text-white text-xs block">{meal.calories} kcal</span>
+                              {meal.time && <span className="text-[10px] text-zinc-500 font-mono block">{meal.time} Uhr</span>}
+                            </div>
                             <button 
-                              onClick={() => removeMeal(meal.id)} 
-                              className="text-zinc-500 hover:text-rose-400 p-1 rounded-lg hover:bg-zinc-800/60"
-                              title="Löschen"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeMeal(meal.id);
+                              }} 
+                              className="text-zinc-500 hover:text-rose-400 p-1.5 rounded-lg hover:bg-rose-500/10 transition-colors"
+                              title="Eintrag löschen"
                             >
-                              <Trash2 size={13} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </div>
@@ -1389,6 +1417,80 @@ export default function CalorieTrackerModal({
                 ))}
               </div>
 
+            </div>
+          </div>
+        )}
+
+        {/* 8. Edit / View Meal Details Modal (wenn man auf eine eingetragene Mahlzeit tippt) */}
+        {editingMeal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/90 backdrop-blur-xl animate-in fade-in duration-200">
+            <div className="w-full max-w-sm bg-[#111319] border border-zinc-800 rounded-3xl p-5 shadow-2xl space-y-4">
+              <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
+                <span className="font-bold text-white text-sm">Mahlzeit bearbeiten</span>
+                <button
+                  type="button"
+                  onClick={() => setEditingMeal(null)}
+                  className="p-1 rounded-lg text-zinc-400 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div>
+                <h4 className="text-base font-bold text-white">{editingMeal.name}</h4>
+                <p className="text-xs text-zinc-400 mt-0.5">{editingMeal.amount || 'Standardportion'}</p>
+              </div>
+
+              <div className="grid grid-cols-4 gap-2 text-center py-2 bg-[#181c28] rounded-2xl border border-zinc-800">
+                <div>
+                  <span className="text-sm font-bold text-white font-mono">{editingMeal.calories}</span>
+                  <span className="text-[10px] text-zinc-400 block font-medium">kcal</span>
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-rose-300 font-mono">{editingMeal.fat || 0} g</span>
+                  <span className="text-[10px] text-zinc-400 block font-medium">Fett</span>
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-amber-300 font-mono">{editingMeal.carbs || 0} g</span>
+                  <span className="text-[10px] text-zinc-400 block font-medium">KH</span>
+                </div>
+                <div>
+                  <span className="text-sm font-bold text-emerald-300 font-mono">{editingMeal.protein || 0} g</span>
+                  <span className="text-[10px] text-zinc-400 block font-medium">Protein</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newCal = prompt("Kalorien anpassen:", editingMeal.calories);
+                    if (newCal !== null) {
+                      const updated = dailyEntries.map(m => m.id === editingMeal.id ? { ...m, calories: Number(newCal) || m.calories } : m);
+                      setDailyEntries(updated);
+                      try {
+                        localStorage.setItem(`aura_meals_${currentDateKey}`, JSON.stringify(updated));
+                      } catch(e) {}
+                    }
+                    setEditingMeal(null);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-sky-500/20 hover:bg-sky-500/30 text-sky-300 border border-sky-500/40 text-xs font-bold transition-all"
+                >
+                  Nährwerte / Portion ändern
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    removeMeal(editingMeal.id);
+                    setEditingMeal(null);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={14} />
+                  <span>Mahlzeit löschen</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
