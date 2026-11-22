@@ -134,6 +134,80 @@ export default function App() {
     return [];
   });
   const [currentPlayingSong, setCurrentPlayingSong] = useState(null);
+  // Helper to render markdown text with real clickable links and bold styling
+  const renderFormattedText = (rawText) => {
+    if (!rawText) return null;
+
+    // Pattern to detect [Text](url) or bare URLs (https://...)
+    const urlPattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s)]+)/g;
+    const parts = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = urlPattern.exec(rawText)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(rawText.slice(lastIndex, match.index));
+      }
+
+      if (match[1] && match[2]) {
+        // [Title](https://...)
+        const label = match[1];
+        const href = match[2];
+        parts.push(
+          <a
+            key={match.index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-400 hover:text-purple-300 underline font-medium inline-flex items-center gap-0.5 break-all mx-0.5 transition-colors"
+            onClick={(e) => {
+              if (window.require) {
+                try {
+                  e.preventDefault();
+                  const { ipcRenderer } = window.require('electron');
+                  ipcRenderer.send('open-external-url', href);
+                } catch(err) {}
+              }
+            }}
+          >
+            {label}
+          </a>
+        );
+      } else if (match[3]) {
+        // Bare URL
+        const href = match[3];
+        parts.push(
+          <a
+            key={match.index}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-400 hover:text-purple-300 underline font-medium inline-flex items-center gap-0.5 break-all mx-0.5 transition-colors"
+            onClick={(e) => {
+              if (window.require) {
+                try {
+                  e.preventDefault();
+                  const { ipcRenderer } = window.require('electron');
+                  ipcRenderer.send('open-external-url', href);
+                } catch(err) {}
+              }
+            }}
+          >
+            {href}
+          </a>
+        );
+      }
+
+      lastIndex = urlPattern.lastIndex;
+    }
+
+    if (lastIndex < rawText.length) {
+      parts.push(rawText.slice(lastIndex));
+    }
+
+    return parts;
+  };
+
   const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
@@ -522,6 +596,7 @@ export default function App() {
           message: enrichedText, 
           image: imageToSend, 
           history: history,
+          explanationDepth: userProfile?.explanationDepth || localStorage.getItem('aura_explanation_depth') || 'viel',
           userNotionToken: userProfile?.notionToken || localStorage.getItem('aura_custom_notion_token') || '',
           userNotionDbId: userProfile?.notionDbId || localStorage.getItem('aura_custom_notion_db') || ''
         })
@@ -899,7 +974,7 @@ export default function App() {
                       )}
 
                       <div className="leading-relaxed whitespace-pre-wrap">
-                        {msg.text}
+                        {renderFormattedText(msg.text)}
                       </div>
 
                       {/* Generiertes KI Bild */}

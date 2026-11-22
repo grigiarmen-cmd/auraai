@@ -73,6 +73,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     try { return localStorage.getItem('aura_custom_notion_db') || ''; } catch(e) { return ''; }
   });
 
+  // Antwort-Tiefe / Erklärungstiefe (wenig, mid, viel, extrem, ultra)
+  const [explanationDepth, setExplanationDepth] = useState(() => {
+    try { return localStorage.getItem('aura_explanation_depth') || 'viel'; } catch(e) { return 'viel'; }
+  });
+
   if (!isOpen) return null;
 
   const handleSendCode = async () => {
@@ -203,9 +208,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       },
       goal,
       conditions: conditions.trim(),
+      explanationDepth,
       notionToken: userNotionToken.trim(),
       notionDbId: userNotionDbId.trim()
     };
+    localStorage.setItem('aura_explanation_depth', explanationDepth);
     if (userNotionToken.trim()) {
       localStorage.setItem('aura_custom_notion_token', userNotionToken.trim());
     }
@@ -550,7 +557,40 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
               </div>
             </div>
 
-            {/* 6. Optionales Notion Second-Brain (Eigener Token oder Integrierter Speicher) */}
+            {/* 6. Erklärungstiefe & Detailgrad der Antworten */}
+            <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
+              <span className="font-bold text-purple-400 flex items-center gap-1.5">
+                <Sparkles size={14} /> KI-Erklärungstiefe & Detailgrad:
+              </span>
+              <p className="text-[11px] text-zinc-400">
+                Wähle, wie tief und wissenschaftlich Aura dir biologische, medizinische oder ernährungstechnische Fragen beantworten soll:
+              </p>
+              <div className="grid grid-cols-5 gap-1.5 pt-1">
+                {[
+                  { id: 'wenig', label: 'Wenig', desc: '1-2 Sätze, ultra-kurz' },
+                  { id: 'mid', label: 'Mid', desc: 'Kompakte Fakten' },
+                  { id: 'viel', label: 'Viel', desc: 'Ausführlich & klar' },
+                  { id: 'extrem', label: 'Extrem', desc: 'Tief auf Zellebene' },
+                  { id: 'ultra', label: 'Ultra', desc: 'Molekularbiologisch + Studien' }
+                ].map((tier) => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    onClick={() => setExplanationDepth(tier.id)}
+                    className={`py-2 px-1 rounded-xl text-center border transition-all ${
+                      explanationDepth === tier.id
+                        ? 'bg-purple-600/30 border-purple-500 text-purple-300 font-bold shadow-md shadow-purple-500/20'
+                        : 'bg-zinc-950/60 border-zinc-800 text-zinc-400 hover:text-zinc-200 hover:border-zinc-700'
+                    }`}
+                  >
+                    <span className="block text-xs font-semibold capitalize">{tier.label}</span>
+                    <span className="text-[9px] text-zinc-400 block mt-0.5 leading-tight">{tier.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 7. Optionales Notion Second-Brain (Eigener Token oder Integrierter Speicher) */}
             <div className="p-3.5 rounded-2xl bg-zinc-900/40 border border-zinc-800 space-y-2 text-xs">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-indigo-400 flex items-center gap-1.5">

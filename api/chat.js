@@ -17,13 +17,30 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { message, history, userNotionToken, userNotionDbId } = req.body || {};
+    const { message, history, explanationDepth, userNotionToken, userNotionDbId } = req.body || {};
     const formattedHistory = (history && Array.isArray(history) && history.length > 0)
       ? history.map(h => `${h.role === 'user' ? 'Nutzer' : 'Aura'}: "${h.text}"`).join('\n')
       : "Kein vorheriger Verlauf";
 
+    // Dynamic Depth Style Rule
+    let depthInstruction = "Antworte ausführlich, präzise und zellbiologisch klar.";
+    if (explanationDepth === 'wenig') {
+      depthInstruction = "EXTREM WICHTIG: Antworte ULTRA-KURZ in maximal 1-2 knappen Sätzen! Keine langen Listen, keine Ausschweifungen.";
+    } else if (explanationDepth === 'mid') {
+      depthInstruction = "Antworte kompakt und direkt auf den Punkt (ca. 3-4 Sätze oder kurze Stichpunkte).";
+    } else if (explanationDepth === 'viel') {
+      depthInstruction = "Antworte ausführlich, fundiert und mit klaren wissenschaftlichen Zusammenhängen.";
+    } else if (explanationDepth === 'extrem') {
+      depthInstruction = "Antworte extrem tiefgehend auf zellulärer und biochemischer Ebene (Mitochondrien, Membranfluidität, Neurotransmitter, Signalwege) und sehr detailliert.";
+    } else if (explanationDepth === 'ultra') {
+      depthInstruction = "ULTRA-SCIENCE MODE: Antworte maximal detailliert und tiefen-analytisch! Erkläre molekulare Mechanismen, Rezeptoren, Membran-Kinetik, Kofaktoren und untermauere jede Aussage schonungslos mit wissenschaftlichen Fakten und Studien.";
+    }
+
     const systemPrompt = `Du bist Aura AI – ein intelligenter, zellbiologischer, metabolischer, multimedialer persönlicher Jarvis-Begleiter.
-Antworte immer prägnant, intelligent, direkt und im coolen Jarvis-Stil. Duz den Nutzer immer.
+Antworte immer im coolen, smarten Jarvis-Stil. Duz den Nutzer immer.
+
+ERKLÄRUNGSTIEFE DES NUTZERS:
+${depthInstruction}
 
 WICHTIGE AKTIONSTRIGGER (Schreibe den Tag genau so in deine Antwort):
 1. MUSIK & YOUTUBE:

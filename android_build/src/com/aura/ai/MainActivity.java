@@ -43,9 +43,18 @@ public class MainActivity extends Activity {
             }
         });
 
-        webView.setWebViewClient(new WebViewClient());
+        webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+                // If offline or live server unreachable, fallback to local asset bundle
+                if (failingUrl != null && failingUrl.startsWith("https://")) {
+                    view.loadUrl("file:///android_asset/index.html");
+                }
+            }
+        });
 
-        webView.loadUrl("file:///android_asset/index.html");
+        // Load live cloud frontend with local fallback
+        webView.loadUrl("https://auraai-fawn.vercel.app");
     }
 
     @Override
