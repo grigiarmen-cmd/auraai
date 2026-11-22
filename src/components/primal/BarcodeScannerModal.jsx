@@ -13,7 +13,24 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
   const [isLoading, setIsLoading] = useState(false);
   const [productData, setProductData] = useState(null);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'cellular' | 'studies' | 'alternatives'
+  const [activeTab, setActiveTab] = useState('nutrition'); // Default to nutrition/laboratory
+  const [activePortionObj, setActivePortionObj] = useState(null);
+  const [portionMultiplier, setPortionMultiplier] = useState(1);
+  const [currentGrams, setCurrentGrams] = useState(100);
+  const [isAddedToast, setIsAddedToast] = useState(false);
+
+  // Reset or initialize state when opening modal
+  useEffect(() => {
+    if (!isOpen) {
+      setProductData(null);
+      setError(null);
+      setBarcodeInput('');
+      setIsAddedToast(false);
+      setPortionMultiplier(1);
+      setActivePortionObj(null);
+      setCurrentGrams(100);
+    }
+  }, [isOpen]);
 
   const handleScanOrSubmit = async (codeToSearch) => {
     const code = codeToSearch || barcodeInput;
@@ -22,6 +39,7 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     setIsLoading(true);
     setError(null);
     setProductData(null);
+    setIsAddedToast(false);
 
     try {
       let res = await fetch(`${API_BASE}/api/nutrition/barcode/${encodeURIComponent(code)}`);
@@ -33,10 +51,32 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
       }
       const data = await res.json();
       setProductData(data);
+
+      // Initialize default portion
+      const profile = getBiochemicalProfile(data);
+      const defaultPortion = profile.smartPortions?.[0] || { label: '100g Standard', grams: 100 };
+      setActivePortionObj(defaultPortion);
+      setPortionMultiplier(1);
+      setCurrentGrams(defaultPortion.grams);
+      setActiveTab('nutrition');
     } catch (err) {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleSelectPortion = (portion, mult = 1) => {
+    setActivePortionObj(portion);
+    setPortionMultiplier(mult);
+    setCurrentGrams(Math.round(portion.grams * mult));
+  };
+
+  const handleMultiplierChange = (newMult) => {
+    const mult = Math.max(1, parseInt(newMult, 10) || 1);
+    setPortionMultiplier(mult);
+    if (activePortionObj) {
+      setCurrentGrams(Math.round(activePortionObj.grams * mult));
     }
   };
 
@@ -253,8 +293,22 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                   value={barcodeInput}
                   onChange={(e) => setBarcodeInput(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleScanOrSubmit()}
-                  className="w-full bg-zinc-900/90 border border-zinc-700/60 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all font-mono"
+                  className="w-full bg-zinc-900/90 border border-zinc-700/60 rounded-xl px-4 py-3 pr-10 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/70 focus:ring-1 focus:ring-amber-500/50 transition-all font-mono"
                 />
+                {barcodeInput && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBarcodeInput('');
+                      setProductData(null);
+                      setError(null);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white p-1 rounded-full hover:bg-zinc-800"
+                    title="Eingabe leeren"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
               </div>
               <button
                 onClick={() => handleScanOrSubmit()}
@@ -333,23 +387,23 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                     {onAddToTracker && (
                       <button
                         onClick={() => {
-                          const calMatch = (productData.nutrients?.calories || '').match(/(\d+)/);
-                          const protMatch = (productData.nutrients?.protein || '').match(/(\d+(?:\.\d+)?)/);
-                          const fatMatch = (productData.nutrients?.fat || '').match(/(\d+(?:\.\d+)?)/);
-                          const carbMatch = (productData.nutrients?.carbs || '').match(/(\d+(?:\.\d+)?)/);
+                          const profile = getBiochemicalProfile(productData);
+                          const scaled = scaleBiochemicalValues(profile, currentGrams);
                           onAddToTracker({
-                            name: productData.name,
-                            calories: calMatch ? parseInt(calMatch[1], 10) : 250,
-                            protein: protMatch ? parseFloat(protMatch[1]) : 10,
-                            fat: fatMatch ? parseFloat(fatMatch[1]) : 8,
-                            carbs: carbMatch ? parseFloat(carbMatch[1]) : 20,
+                            name: `${productData.name} (${currentGrams}g)`,
+                            calories: scaled.calories,
+                            protein: scaled.protein,
+                            fat: scaled.fat,
+                            carbs: scaled.carbs,
                             isClean: (productData.science?.auraScore || 0) >= 70
                           });
+                          setIsAddedToast(true);
+                          setTimeout(() => setIsAddedToast(false), 2000);
                         }}
-                        className="ml-auto px-2.5 py-1 rounded-lg bg-orange-500/20 hover:bg-orange-500/30 text-orange-300 border border-orange-500/40 text-xs font-bold flex items-center gap-1 transition-all"
+                        className="ml-auto px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 text-black text-xs font-black flex items-center gap-1.5 shadow-md shadow-amber-500/20 active:scale-95 transition-all"
                         title="Zu Kalorien & Makro-Log hinzufügen"
                       >
-                        <Flame size={12} className="text-orange-400" /> + In Tracker
+                        <Check size={14} /> + In Tracker ({currentGrams}g)
                       </button>
                     )}
                   </div>
@@ -402,17 +456,81 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
               {/* Tab: 3-Column Biochemical Laboratory & Vitamins */}
               {activeTab === 'nutrition' && (() => {
                 const profile = getBiochemicalProfile(productData);
-                const scaled = scaleBiochemicalValues(profile, 100);
+                const scaled = scaleBiochemicalValues(profile, currentGrams);
                 return (
                   <div className="space-y-4 text-xs">
-                    {/* Portion pills */}
-                    <div className="flex flex-wrap gap-1.5 items-center">
-                      <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider mr-1">Portionen:</span>
-                      {scaled.smartPortions?.map(p => (
-                        <span key={p.label} className="px-2.5 py-1 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 font-medium text-[11px]">
-                          {p.label}
+                    {/* Dynamic 1-Click Smart Portion Pills & Multiplier Stepper */}
+                    <div className="p-3 bg-zinc-900/60 border border-zinc-800 rounded-2xl space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                          <Scale size={13} /> Portionsgröße wählen:
                         </span>
-                      ))}
+
+                        {/* Multiplier Stepper (Anzahl: - 1 +) */}
+                        <div className="flex items-center gap-1.5 bg-black/60 border border-zinc-700/80 rounded-xl px-2 py-1">
+                          <span className="text-[10px] text-zinc-400 font-semibold uppercase">Anzahl:</span>
+                          <button
+                            type="button"
+                            onClick={() => handleMultiplierChange(portionMultiplier - 1)}
+                            className="w-5 h-5 rounded bg-zinc-800 text-white font-bold flex items-center justify-center hover:bg-zinc-700 text-xs"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="1"
+                            value={portionMultiplier}
+                            onChange={(e) => handleMultiplierChange(e.target.value)}
+                            className="w-7 bg-transparent text-center text-amber-400 font-bold font-mono text-xs focus:outline-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleMultiplierChange(portionMultiplier + 1)}
+                            className="w-5 h-5 rounded bg-zinc-800 text-white font-bold flex items-center justify-center hover:bg-zinc-700 text-xs"
+                          >
+                            +
+                          </button>
+                          <span className="text-[10px] text-amber-300 font-medium">({currentGrams}g)</span>
+                        </div>
+                      </div>
+
+                      {/* Portion Pills */}
+                      <div className="flex flex-wrap gap-1.5 items-center">
+                        {scaled.smartPortions?.map(p => {
+                          const isSelected = activePortionObj?.label === p.label;
+                          return (
+                            <button
+                              key={p.label}
+                              type="button"
+                              onClick={() => handleSelectPortion(p, portionMultiplier)}
+                              className={`px-2.5 py-1.5 rounded-xl font-medium text-xs transition-all ${
+                                isSelected
+                                  ? 'bg-amber-500 text-black font-bold shadow-md shadow-amber-500/20'
+                                  : 'bg-zinc-800/80 text-zinc-300 hover:text-white border border-zinc-700/60'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+
+                        {/* Custom Gram Input */}
+                        <div className="flex items-center gap-1 ml-auto bg-black/60 border border-zinc-700/80 rounded-xl px-2 py-1">
+                          <span className="text-[10px] text-zinc-400 font-medium">Frei:</span>
+                          <input
+                            type="number"
+                            min="1"
+                            value={currentGrams}
+                            onChange={(e) => {
+                              const g = Math.max(1, parseInt(e.target.value, 10) || 1);
+                              setCurrentGrams(g);
+                              setActivePortionObj(null);
+                            }}
+                            className="w-12 bg-transparent text-right text-amber-400 font-mono text-xs font-bold focus:outline-none"
+                          />
+                          <span className="text-[10px] text-zinc-400">g</span>
+                        </div>
+                      </div>
                     </div>
 
                     {/* 3-Column Grid */}
@@ -420,7 +538,7 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                       {/* Col 1 */}
                       <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 space-y-1.5">
                         <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1 border-b border-zinc-800 pb-1">
-                          <Flame size={12} /> Nährwerte (100g)
+                          <Flame size={12} /> Nährwerte ({currentGrams}g)
                         </span>
                         <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
                           <span className="text-zinc-400">Brennwert</span>
@@ -510,6 +628,36 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                         </div>
                       </div>
                     </div>
+
+                    {/* Direct Eintragen Button in Nutrition Tab */}
+                    {onAddToTracker && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onAddToTracker({
+                              name: `${productData.name} (${currentGrams}g)`,
+                              calories: scaled.calories,
+                              protein: scaled.protein,
+                              fat: scaled.fat,
+                              carbs: scaled.carbs,
+                              isClean: (productData.science?.auraScore || 0) >= 70
+                            });
+                            setIsAddedToast(true);
+                            setTimeout(() => setIsAddedToast(false), 2000);
+                          }}
+                          className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                        >
+                          <Check size={18} />
+                          <span>Jetzt eintragen ({currentGrams}g • {scaled.calories} kcal)</span>
+                        </button>
+                        {isAddedToast && (
+                          <p className="text-center text-xs text-emerald-400 font-bold mt-1.5 animate-bounce">
+                            ✓ Erfolgreich ins Ernährungstagebuch eingetragen!
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()}
