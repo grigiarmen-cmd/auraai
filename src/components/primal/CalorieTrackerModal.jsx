@@ -21,6 +21,8 @@ export default function CalorieTrackerModal({
   const [activeItemForDetail, setActiveItemForDetail] = useState(null);
   const [activeProfile, setActiveProfile] = useState(null);
   const [currentGrams, setCurrentGrams] = useState(100);
+  const [portionMultiplier, setPortionMultiplier] = useState(1);
+  const [selectedPortionObj, setSelectedPortionObj] = useState(null);
   const [activeUnitLabel, setActiveUnitLabel] = useState('100g Standard');
   const [mealCategory, setMealCategory] = useState('Mittagessen');
 
@@ -112,9 +114,30 @@ export default function CalorieTrackerModal({
     setActiveItemForDetail(item);
     const profile = getBiochemicalProfile(item);
     setActiveProfile(profile);
-    const defaultServingGrams = profile.smartPortions?.[0]?.grams || 100;
-    setCurrentGrams(defaultServingGrams);
-    setActiveUnitLabel(profile.smartPortions?.[0]?.label || '100g');
+    const firstPortion = profile.smartPortions?.[0] || { label: '100g Standard', grams: 100 };
+    setSelectedPortionObj(firstPortion);
+    setPortionMultiplier(1);
+    setCurrentGrams(firstPortion.grams);
+    setActiveUnitLabel(firstPortion.label);
+  };
+
+  // Change Portion & Multiplier
+  const handleSelectPortion = (portion, multiplier = 1) => {
+    setSelectedPortionObj(portion);
+    setPortionMultiplier(multiplier);
+    const totalG = Math.round(portion.grams * multiplier);
+    setCurrentGrams(totalG);
+    setActiveUnitLabel(`${multiplier > 1 ? multiplier + 'x ' : ''}${portion.label}`);
+  };
+
+  const handleMultiplierChange = (newMult) => {
+    const mult = Math.max(1, parseInt(newMult, 10) || 1);
+    setPortionMultiplier(mult);
+    if (selectedPortionObj) {
+      const totalG = Math.round(selectedPortionObj.grams * mult);
+      setCurrentGrams(totalG);
+      setActiveUnitLabel(`${mult}x ${selectedPortionObj.label}`);
+    }
   };
 
   // Commit scaled item to daily log
@@ -126,7 +149,7 @@ export default function CalorieTrackerModal({
       id: 'entry_' + Date.now(),
       name: activeItemForDetail.name,
       category: mealCategory,
-      amount: `${currentGrams}g (${activeUnitLabel})`,
+      amount: `${portionMultiplier > 1 ? portionMultiplier + 'x ' : ''}${selectedPortionObj?.label || activeUnitLabel} (${currentGrams}g)`,
       calories: scaled.calories,
       protein: scaled.protein,
       fat: scaled.fat,
@@ -368,29 +391,59 @@ export default function CalorieTrackerModal({
                 </button>
               </div>
 
-              {/* Dynamic 1-Click Smart Portion Pills */}
-              <div>
-                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
-                  Portionsgröße wählen (1-Klick)
-                </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {scaled.smartPortions?.map((p) => (
+              {/* Dynamic 1-Click Smart Portion Pills & Multiplier */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block">
+                    Portionsgröße wählen (1-Klick)
+                  </label>
+
+                  {/* Multiplier Stepper: e.g. 1, 2, 3, 4 Stück! */}
+                  <div className="flex items-center gap-1.5 bg-[#12151e] border border-zinc-800 rounded-xl px-2 py-1">
+                    <span className="text-[10px] text-zinc-400 font-semibold uppercase">Anzahl:</span>
                     <button
-                      key={p.label}
                       type="button"
-                      onClick={() => {
-                        setCurrentGrams(p.grams);
-                        setActiveUnitLabel(p.label);
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                        currentGrams === p.grams && activeUnitLabel === p.label
-                          ? 'bg-amber-500 text-black shadow-md'
-                          : 'bg-[#12151e] text-zinc-300 border border-zinc-800 hover:border-zinc-700'
-                      }`}
+                      onClick={() => handleMultiplierChange(portionMultiplier - 1)}
+                      className="w-5 h-5 rounded bg-zinc-800 text-white font-bold flex items-center justify-center hover:bg-zinc-700 text-xs"
                     >
-                      {p.label}
+                      -
                     </button>
-                  ))}
+                    <input
+                      type="number"
+                      min="1"
+                      value={portionMultiplier}
+                      onChange={(e) => handleMultiplierChange(e.target.value)}
+                      className="w-7 bg-transparent text-center text-amber-400 font-bold font-mono text-xs focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleMultiplierChange(portionMultiplier + 1)}
+                      className="w-5 h-5 rounded bg-zinc-800 text-white font-bold flex items-center justify-center hover:bg-zinc-700 text-xs"
+                    >
+                      +
+                    </button>
+                    <span className="text-[10px] text-amber-300 font-medium">({currentGrams}g gesamt)</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {scaled.smartPortions?.map((p) => {
+                    const isSelected = selectedPortionObj?.label === p.label;
+                    return (
+                      <button
+                        key={p.label}
+                        type="button"
+                        onClick={() => handleSelectPortion(p, portionMultiplier)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                          isSelected
+                            ? 'bg-amber-500 text-black shadow-md'
+                            : 'bg-[#12151e] text-zinc-300 border border-zinc-800 hover:border-zinc-700'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
                   <div className="flex items-center gap-1 bg-[#12151e] border border-zinc-800 rounded-xl px-2.5 py-1">
                     <span className="text-[10px] text-zinc-400 font-semibold">Frei:</span>
                     <input
@@ -399,6 +452,8 @@ export default function CalorieTrackerModal({
                       onChange={(e) => {
                         const val = parseFloat(e.target.value) || 0;
                         setCurrentGrams(val);
+                        setSelectedPortionObj(null);
+                        setPortionMultiplier(1);
                         setActiveUnitLabel(`${val}g`);
                       }}
                       className="w-14 bg-transparent text-white font-mono font-bold text-xs focus:outline-none text-right"
