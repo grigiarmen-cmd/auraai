@@ -324,208 +324,215 @@ export default function CalorieTrackerModal({
         </div>
 
         {/* Circadian Fasting / Metabolic State Pill */}
-        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-zinc-900/40 border border-indigo-500/20 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-              <Clock size={13} />
-            </div>
-            <div>
-              <span className="text-[11px] font-bold text-white">Autophagie & Fastenfenster</span>
-              <span className="text-[10px] text-indigo-300/80 ml-2 font-mono">16:15 Std. aktiv</span>
-            </div>
+        <div className="flex items-center justify-between px-4 py-3 rounded-2xl bg-gradient-to-r from-[#21193a] to-[#1c1833] border border-purple-900/40 text-xs shadow-md">
+          <div className="flex items-center gap-2.5">
+            <Clock size={16} className="text-purple-300" />
+            <span className="text-xs font-semibold text-purple-200">Fasten</span>
+            <span className="text-xs font-mono font-bold text-white tracking-wide">15:36:48</span>
           </div>
-          <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Ketose / Fettverbrennung
-          </span>
+          <ChevronRight size={16} className="text-purple-400/80" />
         </div>
 
-        {/* 1. Multi-View Dashboard Carousel (FDDB-Style Swiper with Dots) */}
-        <div className="p-4 rounded-3xl bg-[#0c0e15] border border-zinc-800/90 relative overflow-hidden shadow-xl">
+        {/* 1. FDDB-Authentic Dashboard Card */}
+        <div className="p-4 sm:p-5 rounded-3xl bg-[#0f121d] border border-zinc-800/80 shadow-2xl relative">
           
-          {/* Slide 0: Speedometer Arc + Macro Bars */}
+          {/* Header Row: Dein Tag + Details */}
+          <div className="flex items-center justify-between mb-3 text-xs">
+            <span className="font-bold text-white text-sm">Dein Tag</span>
+            <button 
+              type="button"
+              onClick={() => setDashboardSlide(prev => (prev + 1) % 4)}
+              className="text-sky-400 hover:text-sky-300 font-semibold text-xs flex items-center gap-1 transition-colors"
+            >
+              <span>Details</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+
+          {/* Slide 0: The Classic Circular Arc Layout matching FDDB */}
           {dashboardSlide === 0 && (
-            <div className="space-y-3 animate-in fade-in duration-200">
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-                {/* Left Stat: Gegessen */}
-                <div className="text-center sm:text-left">
-                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Gegessen</span>
-                  <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{totalCalories}</p>
-                  <span className="text-[10px] text-sky-400 font-semibold">{progressPercent}% erreicht</span>
+            <div className="space-y-4 animate-in fade-in duration-200">
+              
+              {/* Central Speedometer Row with perfect symmetry */}
+              <div className="grid grid-cols-3 items-center text-center">
+                
+                {/* Left: 2.194 gegessen / 100% erreicht */}
+                <div className="flex flex-col items-center justify-center">
+                  <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">{totalCalories}</span>
+                  <span className="text-[11px] text-zinc-400 font-medium">gegessen</span>
+                  <span className="text-[10px] text-zinc-500 font-medium mt-2">{progressPercent}% erreicht</span>
                 </div>
 
-                {/* Center: Glowing Circular Arc Speedometer */}
-                <div className="relative w-40 h-28 flex flex-col items-center justify-end">
-                  <svg className="w-36 h-28 overflow-visible" viewBox="0 0 140 85">
+                {/* Center: The Iconic Arc with remaining calories in the middle */}
+                <div className="relative w-36 sm:w-44 h-24 mx-auto flex flex-col items-center justify-end">
+                  <svg className="w-full h-full overflow-visible" viewBox="0 0 160 95">
                     {/* Background Arc */}
                     <path
-                      d="M 15 75 A 55 55 0 0 1 125 75"
+                      d="M 20 85 A 60 60 0 0 1 140 85"
                       fill="none"
-                      stroke="#1f2430"
-                      strokeWidth="10"
+                      stroke="#222838"
+                      strokeWidth="9"
                       strokeLinecap="round"
                     />
-                    {/* Glowing Progress Arc */}
+                    {/* Active Sky-Blue Glowing Progress Arc */}
                     <path
-                      d="M 15 75 A 55 55 0 0 1 125 75"
+                      d="M 20 85 A 60 60 0 0 1 140 85"
                       fill="none"
-                      stroke={caloriesRemaining < 0 ? '#f43f5e' : '#38bdf8'}
-                      strokeWidth="10"
+                      stroke={caloriesRemaining < 0 ? '#f43f5e' : '#60a5fa'}
+                      strokeWidth="9"
                       strokeLinecap="round"
-                      strokeDasharray="172"
-                      strokeDashoffset={172 - (172 * Math.min(100, progressPercent)) / 100}
+                      strokeDasharray="188"
+                      strokeDashoffset={188 - (188 * Math.min(100, progressPercent)) / 100}
                       className="transition-all duration-700 ease-out"
                     />
                   </svg>
 
-                  {/* Inside Arc: Calories Remaining */}
-                  <div className="absolute inset-0 flex flex-col items-center justify-center pt-5">
+                  {/* Centered Number inside Arc */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pt-3">
                     <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
                       caloriesRemaining < 0 ? 'text-rose-400' : 'text-white'
                     }`}>
                       {Math.max(0, caloriesRemaining)}
                     </span>
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">kcal übrig</span>
+                    <span className="text-[10px] text-zinc-400 font-medium">übrig</span>
                   </div>
                 </div>
 
-                {/* Right Stat: Ziel & Verbrannt */}
-                <div className="text-center sm:text-right">
-                  <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Tagesziel</span>
-                  <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{calorieTarget}</p>
-                  <span className="text-[10px] text-emerald-400 font-semibold">0 verbrannt</span>
+                {/* Right: 0 verbrannt / 2.200 Ziel */}
+                <div className="flex flex-col items-center justify-center">
+                  <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">0</span>
+                  <span className="text-[11px] text-zinc-400 font-medium">verbrannt</span>
+                  <div className="mt-2 text-right">
+                    <span className="text-[11px] text-zinc-300 font-mono font-bold block">{calorieTarget}</span>
+                    <span className="text-[9px] text-zinc-500 uppercase font-medium">Ziel</span>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Bottom: 3 Macro Indicators with Pill-Bars (Fett, KH, Protein) */}
+              <div className="grid grid-cols-3 gap-4 pt-2">
+                {/* Fett */}
+                <div className="flex flex-col items-center text-center">
+                  <span className="text-xs font-semibold text-zinc-300 mb-1">Fett</span>
+                  <div className="w-full max-w-[80px] h-1.5 rounded-full bg-[#2a1c22] overflow-hidden mb-1">
+                    <div 
+                      className="h-full rounded-full bg-[#f87171] transition-all duration-500"
+                      style={{ width: `${Math.min(100, (totalFat / 60) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-zinc-400 font-mono">{totalFat}/60 g</span>
+                </div>
+
+                {/* KH */}
+                <div className="flex flex-col items-center text-center">
+                  <span className="text-xs font-semibold text-zinc-300 mb-1">KH</span>
+                  <div className="w-full max-w-[80px] h-1.5 rounded-full bg-[#2d2516] overflow-hidden mb-1">
+                    <div 
+                      className="h-full rounded-full bg-[#fbbf24] transition-all duration-500"
+                      style={{ width: `${Math.min(100, (totalCarbs / 390) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-zinc-400 font-mono">{totalCarbs}/390 g</span>
+                </div>
+
+                {/* Protein */}
+                <div className="flex flex-col items-center text-center">
+                  <span className="text-xs font-semibold text-zinc-300 mb-1">Protein</span>
+                  <div className="w-full max-w-[80px] h-1.5 rounded-full bg-[#182a22] overflow-hidden mb-1">
+                    <div 
+                      className="h-full rounded-full bg-[#4ade80] transition-all duration-500"
+                      style={{ width: `${Math.min(100, (totalProtein / 130) * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[11px] text-zinc-400 font-mono">{totalProtein}/130 g</span>
                 </div>
               </div>
 
-              {/* Macro Progress Bars */}
-              <div className="grid grid-cols-3 gap-3 pt-3 border-t border-zinc-800/60">
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-zinc-400 font-bold">Fett</span>
-                    <span className="text-rose-300 font-mono">{totalFat}/65g</span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
-                    <div className="h-full rounded-full bg-rose-400" style={{ width: `${Math.min(100, (totalFat / 65) * 100)}%` }} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-zinc-400 font-bold">KH</span>
-                    <span className="text-amber-300 font-mono">{totalCarbs}/220g</span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
-                    <div className="h-full rounded-full bg-amber-400" style={{ width: `${Math.min(100, (totalCarbs / 220) * 100)}%` }} />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-[11px]">
-                    <span className="text-zinc-400 font-bold">Protein</span>
-                    <span className="text-emerald-300 font-mono">{totalProtein}/160g</span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
-                    <div className="h-full rounded-full bg-emerald-400" style={{ width: `${Math.min(100, (totalProtein / 160) * 100)}%` }} />
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
           {/* Slide 1: Pure Grams & Kcal Display */}
           {dashboardSlide === 1 && (
-            <div className="grid grid-cols-4 gap-2 text-center py-3 animate-in fade-in duration-200">
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-rose-400 font-mono">{totalFat}g</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Fett</span>
+            <div className="grid grid-cols-4 gap-2 text-center py-2 animate-in fade-in duration-200">
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-[#f87171] font-mono">{totalFat} g</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Fett</span>
               </div>
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{totalCarbs}g</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">KH</span>
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-[#fbbf24] font-mono">{totalCarbs} g</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">KH</span>
               </div>
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">{totalProtein}g</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Protein</span>
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-[#4ade80] font-mono">{totalProtein} g</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Protein</span>
               </div>
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-sky-500/30">
-                <span className="text-xl sm:text-2xl font-black text-sky-400 font-mono">{totalCalories}</span>
-                <span className="text-[10px] text-sky-300 uppercase tracking-wider block mt-1 font-semibold">kcal</span>
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-sky-500/40">
+                <span className="text-xl font-black text-sky-400 font-mono">{totalCalories}</span>
+                <span className="text-[10px] text-sky-300 block mt-1 font-medium">kcal</span>
               </div>
             </div>
           )}
 
           {/* Slide 2: Electrolytes & Hydration (Salz, Kalium, Wasser, Gesättigt) */}
           {dashboardSlide === 2 && (
-            <div className="grid grid-cols-4 gap-2 text-center py-3 animate-in fade-in duration-200">
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-cyan-300 font-mono">6.2g</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Meersalz</span>
+            <div className="grid grid-cols-4 gap-2 text-center py-2 animate-in fade-in duration-200">
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-cyan-300 font-mono">6.2 g</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Meersalz</span>
               </div>
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-purple-300 font-mono">3.8g</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Kalium</span>
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-purple-300 font-mono">3.8 g</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Kalium</span>
               </div>
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-blue-400 font-mono">2.4L</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Wasser</span>
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-blue-400 font-mono">2.4 L</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Wasser</span>
               </div>
-              <div className="p-2 rounded-2xl bg-[#11141f] border border-zinc-800">
-                <span className="text-xl sm:text-2xl font-black text-amber-300 font-mono">28g</span>
-                <span className="text-[10px] text-zinc-400 uppercase tracking-wider block mt-1 font-semibold">Gesätt. Fett</span>
+              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                <span className="text-xl font-black text-amber-300 font-mono">28 g</span>
+                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Gesätt. Fett</span>
               </div>
             </div>
           )}
 
           {/* Slide 3: Formula Equation: Ziel - Gegessen + Verbrannt = Übrig */}
           {dashboardSlide === 3 && (
-            <div className="flex items-center justify-around text-center py-3 animate-in fade-in duration-200">
+            <div className="flex items-center justify-around text-center py-2 animate-in fade-in duration-200">
               <div>
-                <span className="text-xl sm:text-2xl font-black text-white font-mono">{calorieTarget}</span>
-                <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Ziel</span>
+                <span className="text-xl font-black text-white font-mono">{calorieTarget}</span>
+                <span className="text-[10px] text-zinc-400 block font-medium">Ziel</span>
               </div>
-              <span className="text-zinc-500 font-bold text-lg">-</span>
+              <span className="text-zinc-600 font-bold text-lg">-</span>
               <div>
-                <span className="text-xl sm:text-2xl font-black text-sky-400 font-mono">{totalCalories}</span>
-                <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Gegessen</span>
+                <span className="text-xl font-black text-sky-400 font-mono">{totalCalories}</span>
+                <span className="text-[10px] text-zinc-400 block font-medium">gegessen</span>
               </div>
-              <span className="text-zinc-500 font-bold text-lg">+</span>
+              <span className="text-zinc-600 font-bold text-lg">+</span>
               <div>
-                <span className="text-xl sm:text-2xl font-black text-emerald-400 font-mono">0</span>
-                <span className="text-[10px] text-zinc-400 block uppercase font-semibold">Verbrannt</span>
+                <span className="text-xl font-black text-emerald-400 font-mono">0</span>
+                <span className="text-[10px] text-zinc-400 block font-medium">verbrannt</span>
               </div>
-              <span className="text-zinc-500 font-bold text-lg">=</span>
+              <span className="text-zinc-600 font-bold text-lg">=</span>
               <div>
-                <span className="text-xl sm:text-2xl font-black text-amber-400 font-mono">{Math.max(0, caloriesRemaining)}</span>
-                <span className="text-[10px] text-amber-300 block uppercase font-bold">Übrig</span>
+                <span className="text-xl font-black text-amber-400 font-mono">{Math.max(0, caloriesRemaining)}</span>
+                <span className="text-[10px] text-amber-300 block font-bold">übrig</span>
               </div>
             </div>
           )}
 
           {/* Carousel Pagination Dots & Nav Controls */}
-          <div className="flex items-center justify-between pt-2 border-t border-zinc-800/40 mt-1">
-            <button
-              type="button"
-              onClick={() => setDashboardSlide(prev => (prev === 0 ? 3 : prev - 1))}
-              className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <div className="flex items-center gap-1.5">
-              {[0, 1, 2, 3].map(idx => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setDashboardSlide(idx)}
-                  className={`w-2 h-2 rounded-full transition-all ${
-                    dashboardSlide === idx ? 'w-5 bg-sky-400 shadow-sm shadow-sky-400/50' : 'bg-zinc-700'
-                  }`}
-                />
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => setDashboardSlide(prev => (prev === 3 ? 0 : prev + 1))}
-              className="p-1 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors"
-            >
-              <ChevronRight size={16} />
-            </button>
+          <div className="flex items-center justify-center gap-1.5 pt-3 mt-1">
+            {[0, 1, 2, 3].map(idx => (
+              <button
+                key={idx}
+                type="button"
+                onClick={() => setDashboardSlide(idx)}
+                className={`h-1.5 rounded-full transition-all ${
+                  dashboardSlide === idx ? 'w-4 bg-sky-400 shadow-sm shadow-sky-400/50' : 'w-1.5 bg-zinc-700 hover:bg-zinc-600'
+                }`}
+              />
+            ))}
           </div>
 
         </div>
