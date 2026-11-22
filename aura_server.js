@@ -881,7 +881,7 @@ FÄHIGKEITEN-TRIGGER:
   2. STUDIEN-PFLICHT MIT ECHTEN LINKS: Gib bei medizinischen, biochemischen und Nährstoff-Empfehlungen IMMER konkrete PubMed / DOI Studien-Referenzen mit klickbarem Link an! Format: [Studie: Autoren/Titel (Jahr)](https://pubmed.ncbi.nlm.nih.gov/PMID/ oder https://doi.org/...).
 - Wenn der Nutzer kaufbare physische Produkte (Lebensmittel, Hardware, Kleidung) in Notion eintragen will: [ACTION:SEARCH_AND_NOTION:Suchbegriff]
 - Wenn der Nutzer eine Notion-Aktion ausführen will, aber im Chatverlauf oder Profil noch kein Notion-Token hinterlegt ist:
-  Erkläre ihm in 2 kurzen Sätzen, dass er im Profil (`Anmelden/Profil`) unter 'Notion Second-Brain' seinen Token eintragen kann (mit Link https://www.notion.so/profile/integrations), oder dass Aura es alternativ im internen Speicher behält!
+  Erkläre ihm in 2 kurzen Sätzen, dass er im Profil ('Anmelden/Profil') unter 'Notion Second-Brain' seinen Token eintragen kann (mit Link https://www.notion.so/profile/integrations), oder dass Aura es alternativ im internen Speicher behält!
 - Wenn der Nutzer nach seinem Tag, Wetter, Terminen oder "Briefing" fragt: [ACTION:DAILY_BRIEFING]
 - Wenn der Nutzer einen Link oder ein YouTube-Video zusammengefasst haben will: [ACTION:SUMMARIZE_URL:URL]
 - Wenn der Nutzer ein Bild generieren will: [ACTION:GENERATE_IMAGE:Englischer Prompt für Flux]

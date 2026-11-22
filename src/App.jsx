@@ -131,10 +131,7 @@ export default function App() {
       const saved = localStorage.getItem('aura_music_playlist');
       if (saved) return JSON.parse(saved);
     } catch(e) {}
-    return [
-      { id: '1', title: 'Dernière Danse', artist: 'Indila', url: 'https://www.youtube.com/watch?v=K5KAc5CoCuk', addedAt: 'Heute' },
-      { id: '2', title: 'Paro', artist: 'NEJ', url: 'https://www.youtube.com/watch?v=F3_6b8jZ1s4', addedAt: 'Heute' }
-    ];
+    return [];
   });
   const [currentPlayingSong, setCurrentPlayingSong] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
