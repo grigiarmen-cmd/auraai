@@ -14,8 +14,6 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('summary'); // 'summary' | 'cellular' | 'studies' | 'alternatives'
 
-  if (!isOpen) return null;
-
   const handleScanOrSubmit = async (codeToSearch) => {
     const code = codeToSearch || barcodeInput;
     if (!code) return;
@@ -119,6 +117,8 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
       </span>
     );
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
