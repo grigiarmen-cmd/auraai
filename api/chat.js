@@ -60,6 +60,11 @@ WICHTIGE AKTIONSTRIGGER (Schreibe den Tag genau so in deine Antwort):
 4. STUDIEN & WISSENSCHAFT:
    - Gib bei allen medizinischen oder biochemischen Empfehlungen (z.B. Magnesium, Tinnitus, HWS, Mitochondrien, Saatöle) IMMER konkrete PubMed / DOI Studien-Referenzen mit klickbarem Link an! Format: [Studie: Autoren/Titel (Jahr)](https://pubmed.ncbi.nlm.nih.gov/PMID/ oder https://doi.org/...).
 
+5. ERNÄHRUNGSTAGEBUCH (MAHLZEITEN BEARBEITEN & LÖSCHEN):
+   - Wenn der Nutzer eine Mahlzeit löschen oder entfernen will (z.B. "lösche Prosciutto", "nimm 100g Prosciutto raus", "entferne den Apfel"):
+     [ACTION:DELETE_MEAL:Suchbegriff]
+   - Wiederhole oder zitiere NIEMALS interne Kontext-Tags wie [HEUTIGES ERNÄHRUNGSTAGEBUCH: ...] oder [KOFFEIN-STATUS: ...] im Text deiner Antwort! Das sind rein interne Sensor-Informationen für dich.
+
 Gesprächsverlauf:
 ${formattedHistory}`;
 

@@ -769,7 +769,45 @@ export default function App() {
         }
       }
 
-      let cleanReplyText = (data.reply || data.actionStatus || "Erledigt!").replace(/\[ACTION:.*?\]/g, '').trim();
+      // Auto-handler for deleting / removing logged meals via chat command
+      const rawText = data.reply || '';
+      if (rawText.includes('[ACTION:DELETE_MEAL:') || textToSend.toLowerCase().includes('rausnehmen') || textToSend.toLowerCase().includes('lösche') || textToSend.toLowerCase().includes('entferne')) {
+        try {
+          const todayKey = new Date().toISOString().split('T')[0];
+          const saved = localStorage.getItem(`aura_meals_${todayKey}`);
+          if (saved) {
+            let meals = JSON.parse(saved);
+            const match = rawText.match(/\[ACTION:DELETE_MEAL:(.*?)\]/);
+            const query = match && match[1] ? match[1].trim().toLowerCase() : textToSend.toLowerCase();
+
+            // Find index of meal matching query keywords (e.g. "prosciutto")
+            const idx = meals.findIndex(m => {
+              const nameLower = (m.name || '').toLowerCase();
+              return query.split(/\s+/).some(word => word.length > 3 && nameLower.includes(word));
+            });
+
+            if (idx !== -1) {
+              const removedMeal = meals[idx];
+              meals.splice(idx, 1);
+              localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(meals));
+              window.dispatchEvent(new Event('storage'));
+              window.dispatchEvent(new CustomEvent('aura_meals_updated', { detail: { dateKey: todayKey } }));
+              console.log('Successfully removed meal from diary:', removedMeal.name);
+            }
+          }
+        } catch (delErr) {
+          console.error('Error removing meal from diary:', delErr);
+        }
+      }
+
+      // Clean reply text from any leaked internal tags
+      let cleanReplyText = (data.reply || data.actionStatus || "Erledigt!")
+        .replace(/\[ACTION:.*?\]/g, '')
+        .replace(/\[HEUTIGES ERNÄHRUNGSTAGEBUCH:.*?\]/gs, '')
+        .replace(/\[KOFFEIN-STATUS:.*?\]/gs, '')
+        .replace(/\[PATIENTEN-KONTEXT:.*?\]/gs, '')
+        .replace(/\[AKTUELLER LABOR-STATUS:.*?\]/gs, '')
+        .trim();
 
       const assistantMsg = {
         role: 'assistant',

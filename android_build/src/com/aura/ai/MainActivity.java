@@ -3,10 +3,13 @@ package com.aura.ai;
 import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.webkit.PermissionRequest;
+import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -17,8 +20,11 @@ import android.view.WindowManager;
 public class MainActivity extends Activity {
 
     private static final int CAMERA_PERMISSION_CODE = 1001;
+    private static final int FILE_CHOOSER_REQUEST_CODE = 2001;
+
     private WebView webView;
     private PermissionRequest pendingWebPermission;
+    private ValueCallback<Uri[]> fileUploadCallback;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -28,7 +34,6 @@ public class MainActivity extends Activity {
         requestWindowFeature(Window.FEATURE_NO_TITLE);
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-        // Prompt native camera and audio permissions at runtime if needed
         checkAndRequestNativePermissions();
 
         webView = new WebView(this);
@@ -58,19 +63,38 @@ public class MainActivity extends Activity {
                     request.grant(request.getResources());
                 });
             }
+
+            // Android Native File / Camera Chooser Handler
+            @Override
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+                if (fileUploadCallback != null) {
+                    fileUploadCallback.onReceiveValue(null);
+                    fileUploadCallback = null;
+                }
+                fileUploadCallback = filePathCallback;
+
+                try {
+                    Intent intent = fileChooserParams.createIntent();
+                    startActivityForResult(intent, FILE_CHOOSER_REQUEST_CODE);
+                } catch (Exception e) {
+                    Intent fallbackIntent = new Intent(Intent.ACTION_GET_CONTENT);
+                    fallbackIntent.addCategory(Intent.CATEGORY_OPENABLE);
+                    fallbackIntent.setType("image/*");
+                    startActivityForResult(Intent.createChooser(fallbackIntent, "Foto auswählen oder aufnehmen"), FILE_CHOOSER_REQUEST_CODE);
+                }
+                return true;
+            }
         });
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
-                // If offline or live server unreachable, fallback to local asset bundle
                 if (failingUrl != null && failingUrl.startsWith("https://")) {
                     view.loadUrl("file:///android_asset/index.html");
                 }
             }
         });
 
-        // Load live cloud frontend with local fallback
         webView.loadUrl("https://auraai-fawn.vercel.app");
     }
 
@@ -82,6 +106,29 @@ public class MainActivity extends Activity {
                     Manifest.permission.CAMERA,
                     Manifest.permission.RECORD_AUDIO
                 }, CAMERA_PERMISSION_CODE);
+            }
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == FILE_CHOOSER_REQUEST_CODE) {
+            if (fileUploadCallback != null) {
+                Uri[] results = null;
+                if (resultCode == Activity.RESULT_OK && data != null) {
+                    if (data.getData() != null) {
+                        results = new Uri[]{ data.getData() };
+                    } else if (data.getClipData() != null) {
+                        int count = data.getClipData().getItemCount();
+                        results = new Uri[count];
+                        for (int i = 0; i < count; i++) {
+                            results[i] = data.getClipData().getItemAt(i).getUri();
+                        }
+                    }
+                }
+                fileUploadCallback.onReceiveValue(results);
+                fileUploadCallback = null;
             }
         }
     }
