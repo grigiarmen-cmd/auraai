@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
-import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink, Flame, Check, Camera, Type } from 'lucide-react';
+import { QrCode, Search, AlertTriangle, ShieldCheck, BookOpen, MapPin, Sparkles, X, ChevronRight, ExternalLink, Flame, Check, Camera, Type, Zap, Scale } from 'lucide-react';
+import { getBiochemicalProfile, scaleBiochemicalValues } from '../../services/deepNutritionService';
 
 export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStore, onAddToTracker }) {
   const [barcodeInput, setBarcodeInput] = useState('');
@@ -322,8 +323,9 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
               )}
 
               {/* Tab Navigation */}
-              <div className="flex border-b border-zinc-800 gap-2">
+              <div className="flex border-b border-zinc-800 gap-2 overflow-x-auto no-scrollbar">
                 {[
+                  { id: 'nutrition', label: '3-Säulen Labor & Vitamine', icon: Zap },
                   { id: 'summary', label: 'Zellwirkung & Zutaten', icon: AlertTriangle },
                   { id: 'hormones', label: 'Hormon- & Vitalitäts-Index', icon: Sparkles },
                   { id: 'studies', label: 'Studien & Quellen', icon: BookOpen },
@@ -346,6 +348,121 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                   );
                 })}
               </div>
+
+              {/* Tab: 3-Column Biochemical Laboratory & Vitamins */}
+              {activeTab === 'nutrition' && (() => {
+                const profile = getBiochemicalProfile(productData);
+                const scaled = scaleBiochemicalValues(profile, 100);
+                return (
+                  <div className="space-y-4 text-xs">
+                    {/* Portion pills */}
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider mr-1">Portionen:</span>
+                      {scaled.smartPortions?.map(p => (
+                        <span key={p.label} className="px-2.5 py-1 rounded-lg bg-zinc-800/80 border border-zinc-700/60 text-zinc-300 font-medium text-[11px]">
+                          {p.label}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* 3-Column Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Col 1 */}
+                      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 space-y-1.5">
+                        <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1 border-b border-zinc-800 pb-1">
+                          <Flame size={12} /> Nährwerte (100g)
+                        </span>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Brennwert</span>
+                          <span className="font-mono text-zinc-200">{scaled.brennwertKj} kJ</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40 font-bold text-white">
+                          <span>Kalorien</span>
+                          <span className="font-mono text-amber-400">{scaled.calories} kcal</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Protein</span>
+                          <span className="font-mono text-emerald-400 font-bold">{scaled.protein} g</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Fett</span>
+                          <span className="font-mono text-amber-400 font-bold">{scaled.fat} g</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Kohlenhydrate</span>
+                          <span className="font-mono text-blue-400 font-bold">{scaled.carbs} g</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 text-zinc-400">
+                          <span>Cholesterin</span>
+                          <span className="font-mono text-zinc-300">{scaled.cholesterol} mg</span>
+                        </div>
+                      </div>
+
+                      {/* Col 2 */}
+                      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 space-y-1.5">
+                        <span className="text-[11px] font-bold text-purple-400 flex items-center gap-1 border-b border-zinc-800 pb-1">
+                          <Sparkles size={12} /> Vitamine
+                        </span>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Vitamin A (Retinol)</span>
+                          <span className="font-mono text-zinc-200">{scaled.vitamins.vitA} µg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Vitamin D3</span>
+                          <span className="font-mono text-zinc-200">{scaled.vitamins.vitD} µg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Vitamin C</span>
+                          <span className="font-mono text-zinc-200">{scaled.vitamins.vitC} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Vitamin E</span>
+                          <span className="font-mono text-zinc-200">{scaled.vitamins.vitE} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400 font-semibold text-purple-300">Vitamin B12</span>
+                          <span className="font-mono font-bold text-purple-300">{scaled.vitamins.vitB12} µg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 text-zinc-400">
+                          <span className="text-zinc-300">Cholin (Fokus)</span>
+                          <span className="font-mono font-bold text-amber-300">{scaled.vitamins.cholin} mg</span>
+                        </div>
+                      </div>
+
+                      {/* Col 3 */}
+                      <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3 space-y-1.5">
+                        <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 border-b border-zinc-800 pb-1">
+                          <Zap size={12} /> Mineralstoffe
+                        </span>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400 font-semibold text-emerald-300">Magnesium</span>
+                          <span className="font-mono font-bold text-emerald-300">{scaled.minerals.magnesium} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400 font-semibold text-emerald-300">Zink</span>
+                          <span className="font-mono font-bold text-emerald-300">{scaled.minerals.zink} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Eisen {scaled.minerals.isHemeIron ? '(Häm)' : ''}</span>
+                          <span className="font-mono text-zinc-200">{scaled.minerals.eisen} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Kalium</span>
+                          <span className="font-mono text-zinc-200">{scaled.minerals.kalium} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 border-b border-zinc-800/40">
+                          <span className="text-zinc-400">Kalzium</span>
+                          <span className="font-mono text-zinc-200">{scaled.minerals.kalzium} mg</span>
+                        </div>
+                        <div className="flex justify-between py-0.5 text-zinc-400">
+                          <span>Selen / Kupfer</span>
+                          <span className="font-mono text-zinc-200">{scaled.minerals.selen} µg</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Tab: Cellular Breakdown */}
               {activeTab === 'summary' && (

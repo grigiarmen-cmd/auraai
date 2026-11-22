@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { getApiBaseUrl } from '../../services/apiConfig';
 const API_BASE = getApiBaseUrl();
 import { 
-  Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Apple, ChevronRight, 
-  Activity, Clock, QrCode, Camera, ChevronDown, ChevronUp, Scale, AlertTriangle, ShieldCheck
+  Flame, Plus, Search, Trash2, X, Sparkles, CheckCircle2, Scale, 
+  Clock, QrCode, Camera, ShieldCheck, AlertTriangle, ChevronRight, Zap, Droplet
 } from 'lucide-react';
+import { getBiochemicalProfile, scaleBiochemicalValues } from '../../services/deepNutritionService';
 
 export default function CalorieTrackerModal({ 
   isOpen, 
@@ -16,14 +17,14 @@ export default function CalorieTrackerModal({
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
 
-  // Selected item for portion & gram calculation modal (Yazio Style)
+  // Selected item for 3-Column Biochemical Laboratory Modal
   const [activeItemForDetail, setActiveItemForDetail] = useState(null);
-  const [amount, setAmount] = useState('100');
-  const [selectedUnit, setSelectedUnit] = useState('Gramm'); // 'Gramm' | 'Portion' | '100g'
-  const [mealCategory, setMealCategory] = useState('Mittagessen'); // 'Frühstück' | 'Mittagessen' | 'Abendessen' | 'Snack'
-  const [showMicrosAccordion, setShowMicrosAccordion] = useState(false);
+  const [activeProfile, setActiveProfile] = useState(null);
+  const [currentGrams, setCurrentGrams] = useState(100);
+  const [activeUnitLabel, setActiveUnitLabel] = useState('100g Standard');
+  const [mealCategory, setMealCategory] = useState('Mittagessen');
 
-  // Daily Log State stored in localStorage by date string YYYY-MM-DD
+  // Daily Log State
   const todayKey = new Date().toISOString().split('T')[0];
   const [dailyEntries, setDailyEntries] = useState(() => {
     try {
@@ -31,7 +32,7 @@ export default function CalorieTrackerModal({
       if (saved) return JSON.parse(saved);
     } catch(e) {}
     return [
-      { id: '1', name: '3 Rühreier in Weidebutter', category: 'Frühstück', amount: '1 Portion', calories: 340, protein: 21, fat: 28, carbs: 1.5, time: '08:30' }
+      { id: '1', name: '3 Rühreier in Weidebutter', category: 'Frühstück', amount: '1 Portion (180g)', calories: 340, protein: 21, fat: 28, carbs: 1.5, time: '08:30' }
     ];
   });
 
@@ -76,56 +77,36 @@ export default function CalorieTrackerModal({
   // Open detail calculator for an item
   const openDetailCalculator = (item) => {
     setActiveItemForDetail(item);
-    setAmount('100');
-    setSelectedUnit('Gramm');
-    setShowMicrosAccordion(false);
-  };
-
-  // Calculate scaled values based on amount & unit
-  const calculateScaledMacros = () => {
-    if (!activeItemForDetail) return { calories: 0, protein: 0, fat: 0, carbs: 0, ratio: 1 };
-    const numAmount = parseFloat(amount) || 100;
-    
-    // Base assumptions: If item has serving with grams, derive baseline per 100g
-    let ratio = 1;
-    if (selectedUnit === 'Gramm') {
-      ratio = numAmount / 100;
-    } else if (selectedUnit === 'Portion') {
-      ratio = numAmount;
-    } else {
-      ratio = (numAmount * 100) / 100;
-    }
-
-    return {
-      calories: Math.round((activeItemForDetail.calories || 0) * (selectedUnit === 'Gramm' ? ratio : ratio)),
-      protein: Math.round(((activeItemForDetail.protein || 0) * (selectedUnit === 'Gramm' ? ratio : ratio)) * 10) / 10,
-      fat: Math.round(((activeItemForDetail.fat || 0) * (selectedUnit === 'Gramm' ? ratio : ratio)) * 10) / 10,
-      carbs: Math.round(((activeItemForDetail.carbs || 0) * (selectedUnit === 'Gramm' ? ratio : ratio)) * 10) / 10,
-      ratio
-    };
+    const profile = getBiochemicalProfile(item);
+    setActiveProfile(profile);
+    const defaultServingGrams = profile.smartPortions?.[0]?.grams || 100;
+    setCurrentGrams(defaultServingGrams);
+    setActiveUnitLabel(profile.smartPortions?.[0]?.label || '100g');
   };
 
   // Commit scaled item to daily log
   const handleSaveScaledMeal = () => {
-    if (!activeItemForDetail) return;
-    const scaled = calculateScaledMacros();
+    if (!activeItemForDetail || !activeProfile) return;
+    const scaled = scaleBiochemicalValues(activeProfile, currentGrams);
+    
     const newEntry = {
       id: 'entry_' + Date.now(),
       name: activeItemForDetail.name,
       category: mealCategory,
-      amount: `${amount} ${selectedUnit}`,
+      amount: `${currentGrams}g (${activeUnitLabel})`,
       calories: scaled.calories,
       protein: scaled.protein,
       fat: scaled.fat,
       carbs: scaled.carbs,
-      micros: activeItemForDetail.micros,
-      isClean: activeItemForDetail.isClean !== false,
-      warning: activeItemForDetail.warning || null,
+      bioScore: scaled.bioScore,
+      cellPower: scaled.cellPower,
+      isClean: scaled.bioScore >= 70,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
     setDailyEntries([newEntry, ...dailyEntries]);
     setActiveItemForDetail(null);
+    setActiveProfile(null);
     setSearchQuery('');
     setSearchResults([]);
   };
@@ -144,13 +125,13 @@ export default function CalorieTrackerModal({
   const caloriesRemaining = calorieTarget - totalCalories;
   const progressPercent = Math.min(100, Math.round((totalCalories / calorieTarget) * 100));
 
-  const scaled = calculateScaledMacros();
+  const scaled = activeProfile ? scaleBiochemicalValues(activeProfile, currentGrams) : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl bg-zinc-950/95 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[94vh] p-5 sm:p-6 space-y-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-2xl bg-[#090a0f] border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[96vh] p-4 sm:p-6 space-y-4">
         
-        {/* Header with Title and Integrated Fast-Access Buttons */}
+        {/* Header */}
         <div className="flex items-center justify-between border-b border-zinc-800/80 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-2xl bg-gradient-to-tr from-amber-500/20 to-orange-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400">
@@ -158,9 +139,9 @@ export default function CalorieTrackerModal({
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-white tracking-wide flex items-center gap-1.5">
-                Aura Nährstoff & Kalorien-Tracker <Sparkles size={14} className="text-amber-400" />
+                Aura Nährstoff & Deep Nutrition Tracker <Sparkles size={14} className="text-amber-400" />
               </h2>
-              <p className="text-[10px] sm:text-[11px] text-zinc-400">Tagesbudget, Gramm-Kalkulator & Deep Nutrition</p>
+              <p className="text-[10px] sm:text-[11px] text-zinc-400">Echtzeit-Biochemie, Vitamine & FDDB Live-Katalog</p>
             </div>
           </div>
           <button 
@@ -177,7 +158,7 @@ export default function CalorieTrackerModal({
             onClick={() => {
               if (onOpenBarcodeScanner) onOpenBarcodeScanner();
             }}
-            className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-amber-500/50 hover:bg-zinc-800/60 text-xs font-semibold text-amber-300 transition-all group"
+            className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-[#11131a] border border-zinc-800 hover:border-amber-500/50 hover:bg-zinc-800/60 text-xs font-semibold text-amber-300 transition-all group"
           >
             <QrCode size={15} className="text-amber-400 group-hover:scale-110 transition-transform" />
             <span>Barcode scannen</span>
@@ -187,15 +168,15 @@ export default function CalorieTrackerModal({
             onClick={() => {
               if (onOpenMealVision) onOpenMealVision();
             }}
-            className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-zinc-900 border border-zinc-800 hover:border-orange-500/50 hover:bg-zinc-800/60 text-xs font-semibold text-orange-300 transition-all group"
+            className="flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-[#11131a] border border-zinc-800 hover:border-orange-500/50 hover:bg-zinc-800/60 text-xs font-semibold text-orange-300 transition-all group"
           >
             <Camera size={15} className="text-orange-400 group-hover:scale-110 transition-transform" />
             <span>Foto Scan (Vision)</span>
           </button>
         </div>
 
-        {/* 1. Yazio Style Calorie Budget Speedometer & Remaining Display */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 space-y-2.5">
+        {/* 1. Calorie Budget Speedometer & Remaining Display */}
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#11131a] border border-zinc-800/80 space-y-2.5">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase tracking-widest font-semibold">Tagesbudget</span>
@@ -225,15 +206,15 @@ export default function CalorieTrackerModal({
 
           {/* Macro Pills */}
           <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-            <div className="p-1.5 sm:p-2 rounded-xl bg-zinc-950/60 border border-zinc-800/60">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-black/60 border border-zinc-800/60">
               <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase">Protein</span>
               <p className="text-xs sm:text-sm font-bold text-emerald-400 mt-0.5">{totalProtein}g</p>
             </div>
-            <div className="p-1.5 sm:p-2 rounded-xl bg-zinc-950/60 border border-zinc-800/60">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-black/60 border border-zinc-800/60">
               <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase">Fett</span>
               <p className="text-xs sm:text-sm font-bold text-amber-400 mt-0.5">{totalFat}g</p>
             </div>
-            <div className="p-1.5 sm:p-2 rounded-xl bg-zinc-950/60 border border-zinc-800/60">
+            <div className="p-1.5 sm:p-2 rounded-xl bg-black/60 border border-zinc-800/60">
               <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase">Carbs</span>
               <p className="text-xs sm:text-sm font-bold text-blue-400 mt-0.5">{totalCarbs}g</p>
             </div>
@@ -246,16 +227,16 @@ export default function CalorieTrackerModal({
             <Search className="absolute left-3.5 top-3 text-zinc-500" size={16} />
             <input
               type="text"
-              placeholder="Mahlzeit suchen (z.B. 'Mango', 'Rumpsteak', 'Pizza', 'Hähnchen Reis')..."
+              placeholder="Mahlzeit suchen (z.B. 'Eier', 'Mango', 'Apfel', 'Rumpsteak', 'Pizza')..."
               value={searchQuery}
               onChange={(e) => handleSearch(e.target.value)}
-              className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
+              className="w-full bg-[#11131a] border border-zinc-800 rounded-xl pl-10 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
             />
           </div>
 
           {/* Autocomplete Search Dropdown */}
           {searchResults.length > 0 && (
-            <div className="border border-zinc-800 rounded-xl bg-zinc-900/98 overflow-hidden divide-y divide-zinc-800/60 shadow-2xl max-h-52 overflow-y-auto z-10">
+            <div className="border border-zinc-800 rounded-xl bg-[#0e1017] overflow-hidden divide-y divide-zinc-800/60 shadow-2xl max-h-52 overflow-y-auto z-10">
               {searchResults.map((item) => (
                 <div 
                   key={item.id}
@@ -265,6 +246,9 @@ export default function CalorieTrackerModal({
                   <div className="min-w-0 pr-2">
                     <div className="flex items-center gap-1.5">
                       <span className="font-semibold text-white group-hover:text-amber-300 transition-colors truncate">{item.name}</span>
+                      {item.source === 'FDDB' && (
+                        <span className="px-1.5 py-0.2 text-[9px] bg-blue-500/20 text-blue-300 rounded font-bold">FDDB Live</span>
+                      )}
                       {item.isClean && (
                         <span className="px-1.5 py-0.2 text-[9px] bg-emerald-500/20 text-emerald-300 rounded font-bold">Bio/Clean</span>
                       )}
@@ -283,140 +267,269 @@ export default function CalorieTrackerModal({
           )}
         </div>
 
-        {/* 3. Detail Portion / Gram Modal Overlay (Matching User Screenshot 1:1) */}
-        {activeItemForDetail && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
-            <div className="w-full max-w-md bg-[#13161f] border border-zinc-800 rounded-3xl p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+        {/* 3. Universal 3-Column Biochemical Laboratory Modal Overlay */}
+        {activeItemForDetail && scaled && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/90 backdrop-blur-xl">
+            <div className="w-full max-w-2xl bg-[#090b10] border border-zinc-800 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 max-h-[94vh] overflow-y-auto">
               
-              {/* Header */}
-              <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
-                <div className="min-w-0 pr-2">
-                  <h3 className="text-base font-bold text-white truncate">{activeItemForDetail.name}</h3>
-                  <span className="text-xs text-zinc-400">{activeItemForDetail.serving || 'Standard-Portion'}</span>
+              {/* Product Header */}
+              <div className="flex items-start justify-between border-b border-zinc-800/80 pb-3">
+                <div className="min-w-0 pr-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">{activeItemForDetail.brand || activeItemForDetail.producer || 'Naturprodukt / Markenprodukt'}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                      scaled.bioScore >= 80 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' :
+                      scaled.bioScore >= 60 ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                      'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                    }`}>
+                      Aura Score: {scaled.bioScore}/100
+                    </span>
+                  </div>
+                  <h3 className="text-base sm:text-lg font-black text-white truncate">{activeItemForDetail.name}</h3>
                 </div>
                 <button 
-                  onClick={() => setActiveItemForDetail(null)}
+                  onClick={() => { setActiveItemForDetail(null); setActiveProfile(null); }}
                   className="p-1.5 text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {/* Macro Cards Preview */}
-              <div className="grid grid-cols-4 gap-2 text-center bg-zinc-900/80 p-3 rounded-2xl border border-zinc-800/80">
-                <div>
-                  <span className="text-lg font-black text-white">{scaled.calories}</span>
-                  <span className="block text-[10px] text-zinc-400 font-semibold">kcal</span>
-                </div>
-                <div>
-                  <span className="text-lg font-black text-amber-400">{scaled.fat} g</span>
-                  <span className="block text-[10px] text-zinc-400 font-semibold">Fett</span>
-                </div>
-                <div>
-                  <span className="text-lg font-black text-blue-400">{scaled.carbs} g</span>
-                  <span className="block text-[10px] text-zinc-400 font-semibold">KH</span>
-                </div>
-                <div>
-                  <span className="text-lg font-black text-emerald-400">{scaled.protein} g</span>
-                  <span className="block text-[10px] text-zinc-400 font-semibold">Protein</span>
-                </div>
-              </div>
-
-              {/* Amount Input & Unit Selector (Gramm, Portion, 100g) */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Menge</label>
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white font-mono font-bold text-base focus:border-amber-500 focus:outline-none"
-                    placeholder="100"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1">Einheit</label>
-                  <select
-                    value={selectedUnit}
-                    onChange={(e) => setSelectedUnit(e.target.value)}
-                    className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3 py-2.5 text-white text-xs font-semibold focus:border-amber-500 focus:outline-none"
-                  >
-                    <option value="Gramm">Gramm (g)</option>
-                    <option value="Portion">Portion / Stück</option>
-                    <option value="100g">100g Einheiten</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Meal Category Selector */}
+              {/* Dynamic 1-Click Smart Portion Pills */}
               <div>
-                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">Mahlzeit-Kategorie</label>
-                <div className="grid grid-cols-4 gap-1.5 text-xs">
-                  {['Frühstück', 'Mittagessen', 'Abendessen', 'Snack'].map((cat) => (
+                <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider block mb-1.5">
+                  Portionsgröße wählen (1-Klick)
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {scaled.smartPortions?.map((p) => (
                     <button
-                      key={cat}
+                      key={p.label}
                       type="button"
-                      onClick={() => setMealCategory(cat)}
-                      className={`py-1.5 px-2 rounded-xl text-center font-medium transition-all ${
-                        mealCategory === cat 
-                          ? 'bg-amber-500 text-black font-bold shadow-md' 
-                          : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                      onClick={() => {
+                        setCurrentGrams(p.grams);
+                        setActiveUnitLabel(p.label);
+                      }}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                        currentGrams === p.grams && activeUnitLabel === p.label
+                          ? 'bg-amber-500 text-black shadow-md'
+                          : 'bg-[#12151e] text-zinc-300 border border-zinc-800 hover:border-zinc-700'
                       }`}
                     >
-                      {cat}
+                      {p.label}
                     </button>
                   ))}
+                  <div className="flex items-center gap-1 bg-[#12151e] border border-zinc-800 rounded-xl px-2.5 py-1">
+                    <span className="text-[10px] text-zinc-400 font-semibold">Frei:</span>
+                    <input
+                      type="number"
+                      value={currentGrams}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        setCurrentGrams(val);
+                        setActiveUnitLabel(`${val}g`);
+                      }}
+                      className="w-14 bg-transparent text-white font-mono font-bold text-xs focus:outline-none text-right"
+                    />
+                    <span className="text-[10px] text-zinc-400">g</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Deep Nutrition & Micronutrient Accordion (Vitamins & Minerals) */}
-              <div className="border border-zinc-800 rounded-2xl overflow-hidden bg-zinc-900/50">
-                <button
-                  type="button"
-                  onClick={() => setShowMicrosAccordion(!showMicrosAccordion)}
-                  className="w-full p-3 flex items-center justify-between text-xs font-bold text-zinc-300 hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <Sparkles size={14} className="text-amber-400" />
-                    <span>Vitamine & Mineralstoffe (Deep Science)</span>
+              {/* 3-Column Biochemical Laboratory Grid (Matches FDDB Screenshot perfectly in Cyberpunk OLED Look) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                
+                {/* Column 1: Energy & Macros */}
+                <div className="bg-[#11141d] border border-zinc-800/80 rounded-2xl p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+                    <span className="text-[11px] font-bold text-amber-400 flex items-center gap-1">
+                      <Flame size={12} /> Nährwerte für {currentGrams}g
+                    </span>
                   </div>
-                  {showMicrosAccordion ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Brennwert</span>
+                      <span className="font-mono text-zinc-300">{scaled.brennwertKj} kJ</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Kalorien</span>
+                      <span className="font-mono font-bold text-white">{scaled.calories} kcal</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Protein</span>
+                      <span className="font-mono font-bold text-emerald-400">{scaled.protein} g</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Fett</span>
+                      <span className="font-mono font-bold text-amber-400">{scaled.fat} g</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 pl-2 text-[11px] text-zinc-400 border-b border-zinc-800/30">
+                      <span>davon gesättigt</span>
+                      <span className="font-mono">{scaled.saturatedFat} g</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Kohlenhydrate</span>
+                      <span className="font-mono font-bold text-blue-400">{scaled.carbs} g</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 pl-2 text-[11px] text-zinc-400 border-b border-zinc-800/30">
+                      <span>davon Zucker</span>
+                      <span className="font-mono">{scaled.sugar} g</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Cholesterin</span>
+                      <span className="font-mono text-zinc-300">{scaled.cholesterol} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 text-zinc-400">
+                      <span>Wassergehalt</span>
+                      <span className="font-mono text-zinc-300">{scaled.waterContent}%</span>
+                    </div>
+                  </div>
+                </div>
 
-                {showMicrosAccordion && (
-                  <div className="p-3 border-t border-zinc-800/80 bg-zinc-950/70 text-xs space-y-2">
-                    {activeItemForDetail.micros ? (
-                      Object.entries(activeItemForDetail.micros).map(([key, val]) => (
-                        <div key={key} className="flex justify-between py-1 border-b border-zinc-800/40 text-[11px]">
-                          <span className="text-zinc-400 capitalize">{key}:</span>
-                          <span className="font-semibold text-zinc-200">{val}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-zinc-400 text-[11px]">
-                        Standard-Nährwerte für {amount}g. Reich an essentiellen Aminosäuren und Mikronährstoffen.
-                      </div>
-                    )}
+                {/* Column 2: Vitamins */}
+                <div className="bg-[#11141d] border border-zinc-800/80 rounded-2xl p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+                    <span className="text-[11px] font-bold text-purple-400 flex items-center gap-1">
+                      <Sparkles size={12} /> Vitamine
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin A (Retinol)</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitA} µg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin D3</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitD} µg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin E</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitE} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin C</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitC} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin B1</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitB1} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin B2</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitB2} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Vitamin B6</span>
+                      <span className="font-mono text-zinc-200">{scaled.vitamins.vitB6} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Vitamin B12</span>
+                      <span className="font-mono font-bold text-purple-300">{scaled.vitamins.vitB12} µg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 text-zinc-400">
+                      <span className="font-semibold text-zinc-300">Cholin (Fokus)</span>
+                      <span className="font-mono font-bold text-amber-300">{scaled.vitamins.cholin} mg</span>
+                    </div>
+                  </div>
+                </div>
 
-                    {activeItemForDetail.warning && (
-                      <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] flex items-start gap-2 mt-2">
-                        <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                        <span>{activeItemForDetail.warning}</span>
-                      </div>
-                    )}
+                {/* Column 3: Minerals & Trace Elements */}
+                <div className="bg-[#11141d] border border-zinc-800/80 rounded-2xl p-3 space-y-2">
+                  <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+                    <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
+                      <Zap size={12} /> Mineralstoffe
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Magnesium</span>
+                      <span className="font-mono font-bold text-emerald-300">{scaled.minerals.magnesium} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400 font-semibold">Zink</span>
+                      <span className="font-mono font-bold text-emerald-300">{scaled.minerals.zink} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">
+                        Eisen {scaled.minerals.isHemeIron ? '(Häm-Eisen)' : '(Pflanzlich)'}
+                      </span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.eisen} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Kalium</span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.kalium} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Kalzium</span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.kalzium} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Phosphor</span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.phosphor} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Selen</span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.selen} µg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 border-b border-zinc-800/50">
+                      <span className="text-zinc-400">Kupfer</span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.kupfer} mg</span>
+                    </div>
+                    <div className="flex justify-between py-0.5 text-zinc-400">
+                      <span>Chlorid / Schwefel</span>
+                      <span className="font-mono text-zinc-200">{scaled.minerals.chlorid} mg</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Aura Bio-Audit & Cellular Impact */}
+              <div className="p-3 rounded-2xl bg-[#11141d] border border-zinc-800/80 space-y-2">
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <ShieldCheck size={15} className="text-emerald-400" />
+                  <span>Aura Bio-Audit & Zellulärer Einfluss</span>
+                </div>
+                <p className="text-xs text-zinc-300 leading-relaxed">{scaled.cellPower}</p>
+                {scaled.antiNutrients && (
+                  <div className="p-2 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-[11px] flex items-start gap-1.5">
+                    <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+                    <span>{scaled.antiNutrients}</span>
                   </div>
                 )}
               </div>
 
-              {/* Submit Button (Eintragen) */}
-              <button
-                type="button"
-                onClick={handleSaveScaledMeal}
-                className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold rounded-2xl shadow-lg transition-all text-sm flex items-center justify-center gap-2"
-              >
-                <CheckCircle2 size={16} />
-                <span>Eintragen ({scaled.calories} kcal)</span>
-              </button>
+              {/* Meal Category & Save */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-1">
+                <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start">
+                  <span className="text-[10px] uppercase font-semibold text-zinc-400">Kategorie:</span>
+                  <div className="flex gap-1 text-xs">
+                    {['Frühstück', 'Mittagessen', 'Abendessen', 'Snack'].map((cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setMealCategory(cat)}
+                        className={`px-2 py-1 rounded-lg font-medium transition-all ${
+                          mealCategory === cat
+                            ? 'bg-amber-500 text-black font-bold'
+                            : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
+                        }`}
+                      >
+                        {cat}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleSaveScaledMeal}
+                  className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-black font-bold rounded-xl shadow-lg transition-all text-xs flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 size={15} />
+                  <span>Jetzt eintragen ({scaled.calories} kcal)</span>
+                </button>
+              </div>
+
             </div>
           </div>
         )}
@@ -432,13 +545,13 @@ export default function CalorieTrackerModal({
 
           {dailyEntries.length === 0 ? (
             <div className="py-8 text-center text-xs text-zinc-500">
-              Noch keine Mahlzeiten eingetragen. Nutze die Suche oder die Schnelltasten oben!
+              Noch keine Mahlzeiten eingetragen. Nutze die Suche oder den Barcode-Scanner!
             </div>
           ) : (
             dailyEntries.map((meal) => (
               <div 
                 key={meal.id}
-                className="p-2.5 rounded-xl bg-zinc-900/40 border border-zinc-800/80 flex items-center justify-between gap-3 text-xs"
+                className="p-2.5 rounded-xl bg-[#11131a] border border-zinc-800/80 flex items-center justify-between gap-3 text-xs"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
