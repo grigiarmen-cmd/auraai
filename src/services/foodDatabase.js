@@ -2,6 +2,73 @@
 // Contains common meals, raw whole foods, ancestral foods and junk/fast foods.
 
 const FOOD_DATABASE = [
+  // Steaks & Rindfleisch-Variationen
+  {
+    id: 'steak-butter',
+    name: 'Rumpsteak / Entrecôte in Weidebutter',
+    aliases: ['steak', 'entrecote', 'rindersteak', 'rumpsteak', 'beef'],
+    serving: '1 Steak (250g)',
+    calories: 620,
+    protein: 62,
+    fat: 41,
+    carbs: 0,
+    micros: { zink: '12.5 mg', vitaminB12: '6.2 mcg', iron: '4.8 mg (Häm-Eisen)', cholin: '180 mg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'ribeye-steak',
+    name: 'Ribeye Steak (Gegrillt)',
+    aliases: ['ribeye', 'rib eye', 'steak ribeye', 'hochrippe'],
+    serving: '1 Steak (300g)',
+    calories: 780,
+    protein: 68,
+    fat: 56,
+    carbs: 0,
+    micros: { zink: '14.1 mg', vitaminB12: '7.5 mcg', iron: '5.2 mg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'filet-steak',
+    name: 'Rinderfilet / Tenderloin Steak',
+    aliases: ['filet', 'rinderfilet', 'filetsteak', 'tenderloin', 'steak filet'],
+    serving: '1 Filet (200g)',
+    calories: 420,
+    protein: 52,
+    fat: 22,
+    carbs: 0,
+    micros: { zink: '11.0 mg', vitaminB12: '5.8 mcg', iron: '4.5 mg' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'steak-frites',
+    name: 'Steak mit Pommes Frites',
+    aliases: ['steak pommes', 'steak frites', 'steak mit beilage'],
+    serving: '1 Portion (200g Steak, 150g Pommes)',
+    calories: 740,
+    protein: 52,
+    fat: 42,
+    carbs: 48,
+    micros: { zink: '9.5 mg', kalium: '850 mg', vitaminC: '15 mg' },
+    isClean: false,
+    warning: 'Pommes werden meist in oxidiertem Frittieröl (Raps/Sonnenblume) zubereitet.'
+  },
+  {
+    id: 'rinderhack-bio',
+    name: 'Bio-Rinderhackfleisch (Weiderind)',
+    aliases: ['hackfleisch', 'hack', 'rinderhack', 'ground beef'],
+    serving: '1 Portion (200g)',
+    calories: 510,
+    protein: 42,
+    fat: 38,
+    carbs: 0,
+    micros: { zink: '10.2 mg', vitaminB12: '5.1 mcg', iron: '4.1 mg' },
+    isClean: true,
+    warning: null
+  },
+
   // Fast Food & Gängige Mahlzeiten
   {
     id: 'pizza-margherita',
@@ -43,9 +110,22 @@ const FOOD_DATABASE = [
     warning: 'Soßen enthalten oft Rapsöl/Zucker. Hackfleisch-Spieß mit Phosphaten.'
   },
   {
+    id: 'cheeseburger',
+    name: 'Cheeseburger / Smashburger',
+    aliases: ['burger', 'cheeseburger', 'hamburger', 'smashburger'],
+    serving: '1 Burger (ca. 220g)',
+    calories: 580,
+    protein: 34,
+    fat: 32,
+    carbs: 42,
+    micros: { zink: '5.2 mg', calcium: '210 mg', iron: '3.5 mg' },
+    isClean: false,
+    warning: 'Brioche-Bun oft mit Pflanzenöl & Zucker. Schmelzkäsezubereitung.'
+  },
+  {
     id: 'haehnchen-reis',
     name: 'Hähnchenbrust mit Jasminreis & Brokkoli',
-    aliases: ['hähnchen reis', 'hühnchen reis', 'fitness teller', 'chicken rice'],
+    aliases: ['hähnchen reis', 'hühnchen reis', 'fitness teller', 'chicken rice', 'reis huhn'],
     serving: '1 Portion (200g Huhn, 150g Reis)',
     calories: 540,
     protein: 52,
@@ -55,19 +135,8 @@ const FOOD_DATABASE = [
     isClean: true,
     warning: null
   },
-  {
-    id: 'steak-butter',
-    name: 'Rumpsteak / Entrecôte in Weidebutter',
-    aliases: ['steak', 'entrecote', 'rindersteak', 'rumpsteak', 'beef'],
-    serving: '1 Steak (250g)',
-    calories: 620,
-    protein: 62,
-    fat: 41,
-    carbs: 0,
-    micros: { zink: '12.5 mg (110% Tagesbedarf)', vitaminB12: '6.2 mcg (250%)', iron: '4.8 mg (Häm-Eisen)', cholin: '180 mg' },
-    isClean: true,
-    warning: null
-  },
+
+  // Ancestral & Clean Whole Foods
   {
     id: 'eier-weidebutter',
     name: '3 Rühreier / Spiegeleier in Bio-Butter',
@@ -77,20 +146,33 @@ const FOOD_DATABASE = [
     protein: 21,
     fat: 28,
     carbs: 1.5,
-    micros: { cholin: '420 mg (80% Tagesbedarf)', retinol: '480 mcg (Vitamin A)', zink: '3.1 mg', lutein: '1200 mcg' },
+    micros: { cholin: '420 mg', retinol: '480 mcg', zink: '3.1 mg', lutein: '1200 mcg' },
     isClean: true,
     warning: null
   },
   {
     id: 'rohmilch-glas',
     name: 'Frische Demeter Weiderohmilch',
-    aliases: ['rohmilch', 'milch', 'weidemilch', 'glas milch'],
+    aliases: ['rohmilch', 'milch', 'weidemilch', 'glas milch', 'raw milk'],
     serving: '1 Glas (300 ml)',
     calories: 195,
     protein: 10.2,
     fat: 12.0,
     carbs: 14.4,
-    micros: { calcium: '360 mg (Bioaktiv)', vitaminK2: '8.4 mcg', lactoferrin: 'High', alkalinePhosphatase: 'Intakt' },
+    micros: { calcium: '360 mg', vitaminK2: '8.4 mcg', lactoferrin: 'High' },
+    isClean: true,
+    warning: null
+  },
+  {
+    id: 'lachs-avocado',
+    name: 'Wildlachs mit halber Avocado',
+    aliases: ['lachs', 'wildlachs', 'salmon', 'avocado lachs'],
+    serving: '200g Lachs + 80g Avocado',
+    calories: 480,
+    protein: 44,
+    fat: 32,
+    carbs: 3,
+    micros: { omega3: '3.8g (DHA/EPA)', astaxanthin: '4 mg', kalium: '820 mg', vitaminD: '18 mcg' },
     isClean: true,
     warning: null
   },
@@ -106,19 +188,6 @@ const FOOD_DATABASE = [
     micros: { magnesium: '110 mg', zink: '2.9 mg', vitaminC: '25 mg', iron: '3.6 mg' },
     isClean: true,
     warning: 'Phytinsäure hemmt Mineralstoffresorption. Einweichen empfohlen.'
-  },
-  {
-    id: 'lachs-avocado',
-    name: 'Wildlachs mit halber Avocado',
-    aliases: ['lachs', 'wildlachs', 'salmon', 'avocado lachs'],
-    serving: '200g Lachs + 80g Avocado',
-    calories: 480,
-    protein: 44,
-    fat: 32,
-    carbs: 3,
-    micros: { omega3: '3.8g (DHA/EPA)', astaxanthin: '4 mg', kalium: '820 mg', vitaminD: '18 mcg' },
-    isClean: true,
-    warning: null
   },
   {
     id: 'nutella-toast',

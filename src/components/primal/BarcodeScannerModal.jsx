@@ -41,46 +41,60 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
 
   // Camera Lifecycle
   useEffect(() => {
-    if (scanMode === 'camera' && isOpen) {
-      const html5QrCode = new Html5Qrcode("aura-barcode-reader");
-      scannerRef.current = html5QrCode;
-      setIsCameraActive(true);
-      setCameraError(null);
+    let html5QrCode = null;
 
-      html5QrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 160 }
-        },
-        (decodedText) => {
-          console.log("Barcode scanned by camera:", decodedText);
-          setBarcodeInput(decodedText);
-          handleScanOrSubmit(decodedText);
-          stopCamera();
-          setScanMode('text');
-        },
-        (errorMessage) => {
-          // ignore frame errors
+    if (scanMode === 'camera' && isOpen) {
+      const startScanner = async () => {
+        try {
+          const element = document.getElementById("aura-barcode-reader");
+          if (!element) return;
+
+          html5QrCode = new Html5Qrcode("aura-barcode-reader");
+          scannerRef.current = html5QrCode;
+          setIsCameraActive(true);
+          setCameraError(null);
+
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            {
+              fps: 10,
+              qrbox: { width: 250, height: 160 }
+            },
+            (decodedText) => {
+              console.log("Barcode scanned by camera:", decodedText);
+              setBarcodeInput(decodedText);
+              handleScanOrSubmit(decodedText);
+              stopCamera();
+              setScanMode('text');
+            },
+            () => {}
+          );
+        } catch (err) {
+          console.warn("Camera start failed:", err);
+          setCameraError("Kamera-Berechtigung erforderlich oder nicht verfügbar.");
+          setIsCameraActive(false);
         }
-      ).catch((err) => {
-        console.warn("Camera start failed:", err);
-        setCameraError("Kamera konnte nicht gestartet werden. Bitte Barcode manuell eingeben.");
-        setIsCameraActive(false);
-      });
+      };
+
+      const timer = setTimeout(startScanner, 200);
 
       return () => {
-        stopCamera();
+        clearTimeout(timer);
+        if (html5QrCode && html5QrCode.isScanning) {
+          html5QrCode.stop().then(() => html5QrCode.clear()).catch(() => {});
+        }
       };
     }
   }, [scanMode, isOpen]);
 
   const stopCamera = () => {
-    if (scannerRef.current && scannerRef.current.isScanning) {
-      scannerRef.current.stop().then(() => {
-        scannerRef.current.clear();
-      }).catch(console.error);
-    }
+    try {
+      if (scannerRef.current && scannerRef.current.isScanning) {
+        scannerRef.current.stop().then(() => {
+          scannerRef.current.clear();
+        }).catch(() => {});
+      }
+    } catch(e) {}
     setIsCameraActive(false);
   };
 
