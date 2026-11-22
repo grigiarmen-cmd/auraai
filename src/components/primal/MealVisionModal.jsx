@@ -37,7 +37,7 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion, onAdd
     setAnalysisResult(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/nutrition/analyze-meal`, {
+      let res = await fetch(`${API_BASE}/api/nutrition/analyze-meal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -47,6 +47,18 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion, onAdd
             : userNote
         })
       });
+
+      if (!res.ok) {
+        // Fallback directly to root serverless endpoint
+        res = await fetch(`${API_BASE}/api/analyze-meal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageBase64: selectedImage,
+            note: userNote
+          })
+        });
+      }
 
       if (!res.ok) {
         throw new Error('Analyse fehlgeschlagen.');

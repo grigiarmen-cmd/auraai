@@ -23,7 +23,10 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     setProductData(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/nutrition/barcode/${encodeURIComponent(code)}`);
+      let res = await fetch(`${API_BASE}/api/nutrition/barcode/${encodeURIComponent(code)}`);
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/api/barcode?code=${encodeURIComponent(code)}`);
+      }
       if (!res.ok) {
         throw new Error('Produkt konnte nicht gefunden werden oder Barcode ist ungültig.');
       }
