@@ -1,4 +1,4 @@
-const { searchFoodDatabase } = require('../src/services/foodDatabase');
+const { searchFoodDatabase } = require('../../src/services/foodDatabase');
 
 module.exports = (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
