@@ -57,7 +57,6 @@ import BarcodeScannerModal from './components/primal/BarcodeScannerModal';
 import MealVisionModal from './components/primal/MealVisionModal';
 import FarmMapModal from './components/primal/FarmMapModal';
 import AuthModal from './components/primal/AuthModal';
-import CalorieTrackerModal from './components/primal/CalorieTrackerModal';
 import BloodWorkModal from './components/primal/BloodWorkModal';
 import CaffeineCircadianModal from './components/primal/CaffeineCircadianModal';
 import InChatFoodCard from './components/primal/InChatFoodCard';
@@ -111,7 +110,6 @@ export default function App() {
   const [isMealVisionOpen, setIsMealVisionOpen] = useState(false);
   const [isFarmMapOpen, setIsFarmMapOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isCalorieTrackerOpen, setIsCalorieTrackerOpen] = useState(false);
   const [isBloodWorkOpen, setIsBloodWorkOpen] = useState(false);
   const [isCaffeineModalOpen, setIsCaffeineModalOpen] = useState(false);
   const [userProfile, setUserProfile] = useState(() => {
@@ -953,19 +951,11 @@ export default function App() {
             {/* 1. Nutrition & Primal Action Group */}
             <div className="flex items-center bg-[#13151b] border border-[#232733] rounded-xl p-0.5 gap-0.5 shrink-0">
               <button
-                onClick={() => setIsCalorieTrackerOpen(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-rose-300 hover:bg-rose-500/15 transition-all"
-                title="Kalorien & Makro Tracker"
+                onClick={() => setIsInChatCameraOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-cyan-300 hover:bg-cyan-500/15 transition-all"
+                title="Barcode & Food Scanner"
               >
-                <Flame className="w-3.5 h-3.5 text-rose-400" />
-                <span className="hidden sm:inline">Tracker</span>
-              </button>
-              <button
-                onClick={() => setIsBarcodeScannerOpen(true)}
-                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold text-amber-300 hover:bg-amber-500/15 transition-all"
-                title="Barcode & Toxicity Scanner"
-              >
-                <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                <QrCode className="w-3.5 h-3.5 text-cyan-400" />
                 <span className="hidden sm:inline">Scanner</span>
               </button>
               <button
@@ -1157,7 +1147,6 @@ export default function App() {
                         <InChatFoodCard
                           foodData={msg.foodData}
                           onLogMeal={handleLogInChatMeal}
-                          onOpenTracker={() => setIsCalorieTrackerOpen(true)}
                         />
                       )}
 
@@ -1271,21 +1260,12 @@ export default function App() {
                 <span className="text-[10px] font-semibold text-[#64748b] px-2 py-0.5 uppercase tracking-wider">Slash Actions</span>
                 <button
                   type="button"
-                  onClick={() => { setShowSlashMenu(false); setInput(''); setIsCalorieTrackerOpen(true); }}
+                  onClick={() => { setShowSlashMenu(false); setInput(''); setIsInChatCameraOpen(true); }}
                   className="flex items-center gap-2 p-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#202533] hover:text-white transition-colors"
                 >
-                  <Flame className="w-3.5 h-3.5 text-rose-400" />
-                  <span className="font-medium text-white">/tracker</span>
-                  <span className="text-[10px] text-[#64748b]">Yazio Kcal & Makro Tracker öffnen</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setShowSlashMenu(false); setInput(''); setIsBarcodeScannerOpen(true); }}
-                  className="flex items-center gap-2 p-1.5 rounded-lg text-xs text-[#cbd5e1] hover:bg-[#202533] hover:text-white transition-colors"
-                >
-                  <QrCode className="w-3.5 h-3.5 text-amber-400" />
+                  <QrCode className="w-3.5 h-3.5 text-cyan-400" />
                   <span className="font-medium text-white">/scanner</span>
-                  <span className="text-[10px] text-[#64748b]">Barcode & Toxizitäts-Scanner</span>
+                  <span className="text-[10px] text-[#64748b]">Barcode Kamera im Chat aktivieren</span>
                 </button>
                 <button
                   type="button"
@@ -1544,7 +1524,6 @@ export default function App() {
         <nav className="sm:hidden border-t border-[#1a1c24] bg-[#0c0d12]/95 backdrop-blur-lg px-2 py-1.5 flex items-center justify-around z-30 shrink-0">
           <button
             onClick={() => {
-              setIsCalorieTrackerOpen(false);
               setIsBarcodeScannerOpen(false);
               setIsMealVisionOpen(false);
             }}
@@ -1555,18 +1534,10 @@ export default function App() {
           </button>
 
           <button
-            onClick={() => setIsCalorieTrackerOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-rose-400 transition-colors"
+            onClick={() => setIsInChatCameraOpen(true)}
+            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-cyan-400 transition-colors"
           >
-            <Flame className="w-4 h-4 text-rose-400" />
-            <span className="text-[9px] font-medium">Tracker</span>
-          </button>
-
-          <button
-            onClick={() => setIsBarcodeScannerOpen(true)}
-            className="flex flex-col items-center gap-0.5 text-zinc-400 hover:text-amber-400 transition-colors"
-          >
-            <QrCode className="w-4 h-4 text-amber-400" />
+            <QrCode className="w-4 h-4 text-cyan-400" />
             <span className="text-[9px] font-medium">Scanner</span>
           </button>
 
@@ -1961,19 +1932,6 @@ export default function App() {
         onDetectedCode={(code) => handleScanInChat(code)}
       />
 
-      <CalorieTrackerModal
-        isOpen={isCalorieTrackerOpen}
-        onClose={() => setIsCalorieTrackerOpen(false)}
-        onOpenBarcodeScanner={() => {
-          setIsCalorieTrackerOpen(false);
-          setIsBarcodeScannerOpen(true);
-        }}
-        onOpenMealVision={() => {
-          setIsCalorieTrackerOpen(false);
-          setIsMealVisionOpen(true);
-        }}
-      />
-
       <BarcodeScannerModal
         isOpen={isBarcodeScannerOpen}
         onClose={() => setIsBarcodeScannerOpen(false)}
@@ -1982,30 +1940,19 @@ export default function App() {
           setIsFarmMapOpen(true);
         }}
         onAddToTracker={(item) => {
-          try {
-            const todayKey = new Date().toISOString().split('T')[0];
-            const saved = localStorage.getItem(`aura_meals_${todayKey}`);
-            const list = saved ? JSON.parse(saved) : [];
-            list.unshift({
-              id: Date.now().toString(),
-              name: item.name,
-              category: item.category || 'Mahlzeit',
-              calories: Number(item.calories) || 0,
-              protein: Number(item.protein) || 0,
-              fat: Number(item.fat) || 0,
-              carbs: Number(item.carbs) || 0,
-              isClean: item.isClean !== false,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
-            localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(list));
-            // Trigger storage event so open modals update instantly
-            window.dispatchEvent(new Event('storage'));
-            window.dispatchEvent(new CustomEvent('aura_meals_updated', { detail: { dateKey: todayKey } }));
-            setIsBarcodeScannerOpen(false);
-            setIsCalorieTrackerOpen(true);
-          } catch(e) {
-            console.error('Error adding scanned item to tracker:', e);
-          }
+          handleLogInChatMeal({
+            id: Date.now().toString(),
+            name: item.name,
+            category: item.category || 'Mahlzeit',
+            amount: '100g',
+            calories: Number(item.calories) || 0,
+            protein: Number(item.protein) || 0,
+            fat: Number(item.fat) || 0,
+            carbs: Number(item.carbs) || 0,
+            isClean: item.isClean !== false,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          setIsBarcodeScannerOpen(false);
         }}
       />
 
@@ -2013,35 +1960,29 @@ export default function App() {
         isOpen={isMealVisionOpen}
         onClose={() => setIsMealVisionOpen(false)}
         onSaveToNotion={(mealData) => {
-          // Log meal directly into Notion or Aura DB
           if (addToNotion) {
             addToNotion(`${mealData.dishName} (${mealData.estimatedMacros?.calories || ''})`, `Aura Score: ${mealData.auraScore}/100 - ${mealData.tier}`);
           }
         }}
         onAddToTracker={(mealData) => {
-          try {
-            const calMatch = (mealData.estimatedMacros?.calories || '').match(/(\d+)/);
-            const protMatch = (mealData.estimatedMacros?.protein || '').match(/(\d+(?:\.\d+)?)/);
-            const fatMatch = (mealData.estimatedMacros?.fat || '').match(/(\d+(?:\.\d+)?)/);
-            const carbMatch = (mealData.estimatedMacros?.carbs || '').match(/(\d+(?:\.\d+)?)/);
-            
-            const todayKey = new Date().toISOString().split('T')[0];
-            const saved = localStorage.getItem(`aura_meals_${todayKey}`);
-            const list = saved ? JSON.parse(saved) : [];
-            list.push({
-              id: Date.now().toString(),
-              name: mealData.dishName || 'Mahlzeit',
-              calories: calMatch ? parseInt(calMatch[1], 10) : 550,
-              protein: protMatch ? parseFloat(protMatch[1]) : 30,
-              fat: fatMatch ? parseFloat(fatMatch[1]) : 25,
-              carbs: carbMatch ? parseFloat(carbMatch[1]) : 40,
-              isClean: (mealData.auraScore || 0) >= 70,
-              time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            });
-            localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(list));
-            setIsMealVisionOpen(false);
-            setIsCalorieTrackerOpen(true);
-          } catch(e) {}
+          const calMatch = (mealData.estimatedMacros?.calories || '').match(/(\d+)/);
+          const protMatch = (mealData.estimatedMacros?.protein || '').match(/(\d+(?:\.\d+)?)/);
+          const fatMatch = (mealData.estimatedMacros?.fat || '').match(/(\d+(?:\.\d+)?)/);
+          const carbMatch = (mealData.estimatedMacros?.carbs || '').match(/(\d+(?:\.\d+)?)/);
+          
+          handleLogInChatMeal({
+            id: Date.now().toString(),
+            name: mealData.dishName || 'Mahlzeit',
+            category: 'Mahlzeit',
+            amount: '1 Portion',
+            calories: calMatch ? parseInt(calMatch[1], 10) : 550,
+            protein: protMatch ? parseFloat(protMatch[1]) : 30,
+            fat: fatMatch ? parseFloat(fatMatch[1]) : 25,
+            carbs: carbMatch ? parseFloat(carbMatch[1]) : 40,
+            isClean: (mealData.auraScore || 0) >= 70,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          });
+          setIsMealVisionOpen(false);
         }}
       />
 
