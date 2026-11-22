@@ -1830,20 +1830,26 @@ export default function App() {
             const todayKey = new Date().toISOString().split('T')[0];
             const saved = localStorage.getItem(`aura_meals_${todayKey}`);
             const list = saved ? JSON.parse(saved) : [];
-            list.push({
+            list.unshift({
               id: Date.now().toString(),
               name: item.name,
-              calories: item.calories,
-              protein: item.protein,
-              fat: item.fat,
-              carbs: item.carbs,
+              category: item.category || 'Mahlzeit',
+              calories: Number(item.calories) || 0,
+              protein: Number(item.protein) || 0,
+              fat: Number(item.fat) || 0,
+              carbs: Number(item.carbs) || 0,
               isClean: item.isClean !== false,
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             });
             localStorage.setItem(`aura_meals_${todayKey}`, JSON.stringify(list));
+            // Trigger storage event so open modals update instantly
+            window.dispatchEvent(new Event('storage'));
+            window.dispatchEvent(new CustomEvent('aura_meals_updated', { detail: { dateKey: todayKey } }));
             setIsBarcodeScannerOpen(false);
             setIsCalorieTrackerOpen(true);
-          } catch(e) {}
+          } catch(e) {
+            console.error('Error adding scanned item to tracker:', e);
+          }
         }}
       />
 

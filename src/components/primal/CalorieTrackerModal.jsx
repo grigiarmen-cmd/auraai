@@ -48,19 +48,36 @@ export default function CalorieTrackerModal({
     ] : [];
   });
 
-  // Reload entries when day changes
+  // Reload entries when day changes OR when external meal is logged
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(`aura_meals_${currentDateKey}`);
-      if (saved) {
-        setDailyEntries(JSON.parse(saved));
-      } else {
+    const loadEntries = () => {
+      try {
+        const saved = localStorage.getItem(`aura_meals_${currentDateKey}`);
+        if (saved) {
+          setDailyEntries(JSON.parse(saved));
+        } else {
+          setDailyEntries([]);
+        }
+      } catch(e) {
         setDailyEntries([]);
       }
-    } catch(e) {
-      setDailyEntries([]);
-    }
-  }, [currentDateKey]);
+    };
+
+    loadEntries();
+
+    const handleStorageUpdate = (e) => {
+      if (e?.detail?.dateKey && e.detail.dateKey !== currentDateKey) return;
+      loadEntries();
+    };
+
+    window.addEventListener('storage', loadEntries);
+    window.addEventListener('aura_meals_updated', handleStorageUpdate);
+
+    return () => {
+      window.removeEventListener('storage', loadEntries);
+      window.removeEventListener('aura_meals_updated', handleStorageUpdate);
+    };
+  }, [currentDateKey, isOpen]);
 
   // Read Bloodwork to provide smart recommendations in search
   const [bloodReport] = useState(() => {
@@ -160,7 +177,11 @@ export default function CalorieTrackerModal({
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    setDailyEntries([newEntry, ...dailyEntries]);
+    const updated = [newEntry, ...dailyEntries];
+    setDailyEntries(updated);
+    try {
+      localStorage.setItem(`aura_meals_${currentDateKey}`, JSON.stringify(updated));
+    } catch(e) {}
     setActiveItemForDetail(null);
     setActiveProfile(null);
     setSearchQuery('');
@@ -168,7 +189,11 @@ export default function CalorieTrackerModal({
   };
 
   const removeMeal = (id) => {
-    setDailyEntries(dailyEntries.filter(e => e.id !== id));
+    const updated = dailyEntries.filter(e => e.id !== id);
+    setDailyEntries(updated);
+    try {
+      localStorage.setItem(`aura_meals_${currentDateKey}`, JSON.stringify(updated));
+    } catch(e) {}
   };
 
   // Macro Totals
@@ -231,77 +256,167 @@ export default function CalorieTrackerModal({
           </button>
         </div>
 
-        {/* Day Navigation Header (Swipe / Click between Yesterday, Today, etc.) */}
-        <div className="flex items-center justify-between bg-[#11141e] border border-zinc-800 rounded-2xl px-3 py-2 text-xs">
-          <button
-            onClick={() => setDayOffset(prev => prev - 1)}
-            className="flex items-center gap-1 text-zinc-400 hover:text-white transition-colors"
-          >
-            <ChevronLeft size={16} />
-            <span className="text-[11px]">Vorheriger Tag</span>
-          </button>
+        {/* FDDB-Inspired 7-Day Circular Calendar Bar */}
+        <div className="flex items-center justify-between gap-1 bg-[#0d0f17] border border-zinc-800/80 rounded-2xl p-2">
+          {[-6, -5, -4, -3, -2, -1, 0].map((offset) => {
+            const dateObj = new Date();
+            dateObj.setDate(dateObj.getDate() + offset);
+            const dayNum = dateObj.getDate();
+            const weekday = dateObj.toLocaleDateString('de-DE', { weekday: 'short' });
+            const isSelected = dayOffset === offset;
+            const isToday = offset === 0;
 
-          <div className="text-center font-bold text-white flex items-center gap-1.5">
-            <span className={dayOffset === 0 ? 'text-amber-400' : 'text-zinc-200'}>
-              {dayOffset === 0 ? 'Heute' : (dayOffset === -1 ? 'Gestern' : currentDateKey)}
-            </span>
-            {dayOffset === 0 && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />}
-          </div>
+            // Check if user has meals on that day
+            const dKey = getTargetDateKey(offset);
+            let hasMeals = false;
+            try {
+              const savedMeals = localStorage.getItem(`aura_meals_${dKey}`);
+              if (savedMeals && JSON.parse(savedMeals).length > 0) hasMeals = true;
+            } catch(e) {}
 
-          <button
-            onClick={() => setDayOffset(prev => Math.min(0, prev + 1))}
-            disabled={dayOffset === 0}
-            className={`flex items-center gap-1 transition-colors ${
-              dayOffset === 0 ? 'text-zinc-600 cursor-not-allowed' : 'text-zinc-400 hover:text-white'
-            }`}
-          >
-            <span className="text-[11px]">Nächster Tag</span>
-            <ChevronRight size={16} />
-          </button>
+            return (
+              <button
+                key={offset}
+                type="button"
+                onClick={() => setDayOffset(offset)}
+                className={`flex-1 flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all ${
+                  isSelected
+                    ? 'bg-gradient-to-b from-sky-500/20 to-blue-600/20 border border-sky-400 shadow-md shadow-sky-500/20'
+                    : 'hover:bg-zinc-800/40 border border-transparent'
+                }`}
+              >
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs transition-transform ${
+                  isSelected
+                    ? 'bg-sky-400 text-black shadow-lg shadow-sky-400/40 scale-105'
+                    : hasMeals
+                      ? 'bg-rose-500/20 border border-rose-500/50 text-rose-300'
+                      : 'bg-zinc-800/80 border border-zinc-700/50 text-zinc-300'
+                }`}>
+                  {dayNum}
+                </div>
+                <span className={`text-[10px] mt-1 font-semibold uppercase tracking-wider ${
+                  isSelected ? 'text-sky-400' : (isToday ? 'text-white' : 'text-zinc-500')
+                }`}>
+                  {weekday}
+                </span>
+              </button>
+            );
+          })}
         </div>
 
-        {/* 1. Calorie Budget Speedometer & Remaining Display */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#11131a] border border-zinc-800/80 space-y-2.5">
-          <div className="flex items-center justify-between">
+        {/* Circadian Fasting / Metabolic State Pill */}
+        <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-zinc-900/40 border border-indigo-500/20 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+              <Clock size={13} />
+            </div>
             <div>
-              <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase tracking-widest font-semibold">Tagesbudget</span>
-              <div className="flex items-baseline gap-2 mt-0.5">
-                <span className={`text-2xl sm:text-3xl font-black ${caloriesRemaining < 0 ? 'text-rose-400' : 'text-white'}`}>
-                  {caloriesRemaining}
+              <span className="text-[11px] font-bold text-white">Autophagie & Fastenfenster</span>
+              <span className="text-[10px] text-indigo-300/80 ml-2 font-mono">16:15 Std. aktiv</span>
+            </div>
+          </div>
+          <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Ketose / Fettverbrennung
+          </span>
+        </div>
+
+        {/* 1. Cyberpunk OLED Circular Gauge & Target Hub */}
+        <div className="p-4 sm:p-5 rounded-3xl bg-[#0c0e15] border border-zinc-800/90 relative overflow-hidden shadow-xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            
+            {/* Left Stat: Gegessen */}
+            <div className="text-center sm:text-left">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Gegessen</span>
+              <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{totalCalories}</p>
+              <span className="text-[10px] text-sky-400 font-semibold">{progressPercent}% erreicht</span>
+            </div>
+
+            {/* Center: Glowing Circular Arc Speedometer */}
+            <div className="relative w-40 h-28 flex flex-col items-center justify-end">
+              <svg className="w-36 h-28 overflow-visible" viewBox="0 0 140 85">
+                {/* Background Arc */}
+                <path
+                  d="M 15 75 A 55 55 0 0 1 125 75"
+                  fill="none"
+                  stroke="#1f2430"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                />
+                {/* Glowing Progress Arc */}
+                <path
+                  d="M 15 75 A 55 55 0 0 1 125 75"
+                  fill="none"
+                  stroke={caloriesRemaining < 0 ? '#f43f5e' : '#38bdf8'}
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray="172"
+                  strokeDashoffset={172 - (172 * Math.min(100, progressPercent)) / 100}
+                  className="transition-all duration-700 ease-out"
+                />
+              </svg>
+
+              {/* Inside Arc: Calories Remaining */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center pt-5">
+                <span className={`text-2xl sm:text-3xl font-black font-mono tracking-tight ${
+                  caloriesRemaining < 0 ? 'text-rose-400' : 'text-white'
+                }`}>
+                  {Math.max(0, caloriesRemaining)}
                 </span>
-                <span className="text-xs text-zinc-400">kcal übrig</span>
+                <span className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">kcal übrig</span>
               </div>
             </div>
-            <div className="text-right text-xs">
-              <span className="text-zinc-400">Ziel: </span>
-              <span className="font-bold text-white">{calorieTarget} kcal</span>
-              <div className="text-[11px] text-amber-400 font-semibold">{totalCalories} gegessen</div>
+
+            {/* Right Stat: Ziel & Verbrannt */}
+            <div className="text-center sm:text-right">
+              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold">Tagesziel</span>
+              <p className="text-2xl sm:text-3xl font-black text-white font-mono mt-0.5">{calorieTarget}</p>
+              <span className="text-[10px] text-emerald-400 font-semibold">0 verbrannt</span>
             </div>
+
           </div>
 
-          {/* Progress Bar */}
-          <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden">
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${
-                caloriesRemaining < 0 ? 'bg-rose-500' : 'bg-gradient-to-r from-emerald-500 via-amber-400 to-orange-500'
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
+          {/* Macro Progress Bars (Fett, KH, Protein) */}
+          <div className="grid grid-cols-3 gap-3 pt-4 mt-2 border-t border-zinc-800/60">
+            {/* Fett */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-400 font-bold">Fett</span>
+                <span className="text-rose-300 font-mono">{totalFat}/65g</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-rose-400 transition-all duration-500"
+                  style={{ width: `${Math.min(100, (totalFat / 65) * 100)}%` }}
+                />
+              </div>
+            </div>
 
-          {/* Macro Pills */}
-          <div className="grid grid-cols-3 gap-2 pt-1 text-center">
-            <div className="p-1.5 sm:p-2 rounded-xl bg-black/60 border border-zinc-800/60">
-              <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase">Protein</span>
-              <p className="text-xs sm:text-sm font-bold text-emerald-400 mt-0.5">{totalProtein}g</p>
+            {/* Kohlenhydrate */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-400 font-bold">KH</span>
+                <span className="text-amber-300 font-mono">{totalCarbs}/220g</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-amber-400 transition-all duration-500"
+                  style={{ width: `${Math.min(100, (totalCarbs / 220) * 100)}%` }}
+                />
+              </div>
             </div>
-            <div className="p-1.5 sm:p-2 rounded-xl bg-black/60 border border-zinc-800/60">
-              <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase">Fett</span>
-              <p className="text-xs sm:text-sm font-bold text-amber-400 mt-0.5">{totalFat}g</p>
-            </div>
-            <div className="p-1.5 sm:p-2 rounded-xl bg-black/60 border border-zinc-800/60">
-              <span className="text-[9px] sm:text-[10px] text-zinc-400 uppercase">Carbs</span>
-              <p className="text-xs sm:text-sm font-bold text-blue-400 mt-0.5">{totalCarbs}g</p>
+
+            {/* Protein */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span className="text-zinc-400 font-bold">Protein</span>
+                <span className="text-emerald-300 font-mono">{totalProtein}/160g</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-zinc-800/80 overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-emerald-400 transition-all duration-500"
+                  style={{ width: `${Math.min(100, (totalProtein / 160) * 100)}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
