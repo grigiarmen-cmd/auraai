@@ -126,11 +126,18 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setMessage(null);
 
     try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
+      let res = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password: password.trim() })
       });
+      if (!res.ok) {
+        res = await fetch(`${API_BASE}/api/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password: password.trim() })
+        });
+      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login fehlgeschlagen');
 
@@ -305,7 +312,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     try {
       // Save to global Cloud Database (Notion)
       if (password) {
-        await fetch(`${API_BASE}/api/auth/register`, {
+        let saveRes = await fetch(`${API_BASE}/api/auth/register`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -314,6 +321,17 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
             profile
           })
         });
+        if (!saveRes.ok) {
+          await fetch(`${API_BASE}/api/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email.trim(),
+              password: password.trim(),
+              profile
+            })
+          });
+        }
       }
 
       localStorage.setItem('aura_saved_email', email.trim());
