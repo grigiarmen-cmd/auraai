@@ -34,9 +34,10 @@ const DAILY_CHORES = [
   { id: 'moving_furniture', name: '📦 Schwere Lasten tragen / Umzug', met: 6.0 }
 ];
 
-export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
+export default function AuthModal({ isOpen, onClose, onAuthSuccess, onLogout }) {
   const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [step, setStep] = useState('auth'); // 'auth' | 'pin' | 'health_profile'
+  const [isNewRegFlow, setIsNewRegFlow] = useState(false);
   const [email, setEmail] = useState(() => {
     try { return localStorage.getItem('aura_saved_email') || ''; } catch(e) { return ''; }
   });
@@ -83,8 +84,16 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     try { return localStorage.getItem('aura_explanation_depth') || 'viel'; } catch(e) { return 'viel'; }
   });
 
-  // Load existing profile from localStorage on open if available
+  // Load existing profile from localStorage on open if available + Escape key
   useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    setError(null);
+    setMessage(null);
+    setIsNewRegFlow(false);
     try {
       const saved = localStorage.getItem('aura_user_profile');
       if (saved) {
@@ -96,7 +105,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         if (p.gender) setGender(p.gender);
         if (p.dailySteps) setDailySteps(p.dailySteps.toString());
         if (p.goal) setGoal(p.goal);
-        if (p.conditions) setConditions(p.conditions);
+        if (p.conditions !== undefined) setConditions(p.conditions);
         if (p.explanationDepth) setExplanationDepth(p.explanationDepth);
         if (p.customMacros?.calories) setCustomCalories(p.customMacros.calories.toString());
         if (p.customMacros?.protein) setCustomProtein(p.customMacros.protein.toString());
@@ -104,9 +113,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         if (p.customMacros?.carbs) setCustomCarbs(p.customMacros.carbs.toString());
         if (p.selectedSports) setSelectedSports(p.selectedSports);
         if (p.selectedChores) setSelectedChores(p.selectedChores);
+        setIsNewRegFlow(false);
+        setStep('health_profile');
+      } else {
+        setStep('auth');
       }
     } catch(e) {}
-  }, [isOpen]);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -126,18 +140,11 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     setMessage(null);
 
     try {
-      let res = await fetch(`${API_BASE}/api/auth/login`, {
+      const res = await fetch(`${API_BASE}/api/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: email.trim(), password: password.trim() })
       });
-      if (!res.ok) {
-        res = await fetch(`${API_BASE}/api/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password: password.trim() })
-        });
-      }
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Login fehlgeschlagen');
 
@@ -146,6 +153,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
 
       // Save to localStorage so user stays logged in across sessions
       localStorage.setItem('aura_saved_email', email.trim());
+      if (data.token) localStorage.setItem('aura_session_token', data.token);
       localStorage.setItem('aura_user_profile', JSON.stringify(profile));
       if (profile.explanationDepth) localStorage.setItem('aura_explanation_depth', profile.explanationDepth);
       if (profile.notionToken) localStorage.setItem('aura_custom_notion_token', profile.notionToken);
@@ -211,6 +219,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Ungültiger oder abgelaufener Code');
 
+      setIsNewRegFlow(true);
       setStep('health_profile');
     } catch (err) {
       setError(err.message);
@@ -262,14 +271,14 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
   const totalWeeklySportsKcal = selectedSports.reduce((acc, s) => {
     const sp = ALL_SPORTS.find(item => item.id === s.sportId);
     const met = sp ? sp.met : 6.0;
-    return acc + (met * w * s.hoursPerWeek);
+    return acc + (Math.max(0, met - 1) * w * s.hoursPerWeek);
   }, 0);
   const dailySportsKcal = totalWeeklySportsKcal / 7;
 
   const totalWeeklyChoresKcal = selectedChores.reduce((acc, c) => {
     const ch = DAILY_CHORES.find(item => item.id === c.choreId);
     const met = ch ? ch.met : 2.5;
-    return acc + (met * w * c.hoursPerWeek);
+    return acc + (Math.max(0, met - 1) * w * c.hoursPerWeek);
   }, 0);
   const dailyChoresKcal = totalWeeklyChoresKcal / 7;
 
@@ -300,7 +309,7 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         calories: finalCalories,
         protein: Number(customProtein) || Math.round(w * 2.2),
         fat: Number(customFat) || Math.round(w * 0.9),
-        carbs: Number(customCarbs) || Math.round((finalCalories - (w * 2.2 * 4) - (w * 0.9 * 9)) / 4)
+        carbs: Number(customCarbs) || Math.max(0, Math.round((finalCalories - (w * 2.2 * 4) - (w * 0.9 * 9)) / 4))
       },
       goal,
       conditions: conditions.trim(),
@@ -310,27 +319,25 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
     };
 
     try {
-      // Save to global Cloud Database (Notion)
-      if (password) {
-        let saveRes = await fetch(`${API_BASE}/api/auth/register`, {
+      const sessionToken = localStorage.getItem('aura_session_token') || '';
+      if (password || sessionToken) {
+        const saveRes = await fetch(`${API_BASE}/api/register`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {})
+          },
           body: JSON.stringify({
             email: email.trim(),
-            password: password.trim(),
+            password: password ? password.trim() : undefined,
+            code: pin ? pin.trim() : undefined,
+            sessionToken,
             profile
           })
         });
-        if (!saveRes.ok) {
-          await fetch(`${API_BASE}/api/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email.trim(),
-              password: password.trim(),
-              profile
-            })
-          });
+        if (saveRes.ok) {
+          const saveData = await saveRes.json();
+          if (saveData.token) localStorage.setItem('aura_session_token', saveData.token);
         }
       }
 
@@ -340,13 +347,13 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
       if (userNotionDbId.trim()) localStorage.setItem('aura_custom_notion_db', userNotionDbId.trim());
       localStorage.setItem('aura_user_profile', JSON.stringify(profile));
 
-      if (onAuthSuccess) onAuthSuccess(profile);
+      if (onAuthSuccess) onAuthSuccess(profile, { isNewRegistration: isNewRegFlow });
       onClose();
     } catch(err) {
       console.error(err);
       // Still allow local completion
       localStorage.setItem('aura_user_profile', JSON.stringify(profile));
-      if (onAuthSuccess) onAuthSuccess(profile);
+      if (onAuthSuccess) onAuthSuccess(profile, { isNewRegistration: isNewRegFlow });
       onClose();
     } finally {
       setIsLoading(false);
@@ -515,9 +522,22 @@ export default function AuthModal({ isOpen, onClose, onAuthSuccess }) {
         {/* STEP 3: Detailed Health, PAL & Metabolism Profile Configuration */}
         {step === 'health_profile' && (
           <div className="space-y-4">
-            <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between text-xs text-indigo-300">
-              <span>Account verifiziert: <b className="text-white">{email}</b></span>
-              <span className="text-[10px] bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-300">Cloud Sync aktiv</span>
+            <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl flex items-center justify-between gap-2 text-xs text-indigo-300">
+              <span className="truncate">Account: <b className="text-white">{email || 'Lokales Profil'}</b></span>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[10px] bg-indigo-500/20 px-2 py-0.5 rounded text-indigo-300">Cloud Sync</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onLogout) onLogout();
+                    setPassword('');
+                    setStep('auth');
+                  }}
+                  className="text-[10px] px-2 py-0.5 rounded bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition-colors"
+                >
+                  Abmelden
+                </button>
+              </div>
             </div>
 
             {/* 1. Basis Körperdaten */}

@@ -19,7 +19,7 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
   const [currentGrams, setCurrentGrams] = useState(100);
   const [isAddedToast, setIsAddedToast] = useState(false);
 
-  // Reset or initialize state when opening modal
+  // Reset or initialize state when opening modal + Escape key support
   useEffect(() => {
     if (!isOpen) {
       setProductData(null);
@@ -29,8 +29,17 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
       setPortionMultiplier(1);
       setActivePortionObj(null);
       setCurrentGrams(100);
+      return;
     }
-  }, [isOpen]);
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        stopCamera();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   const handleScanOrSubmit = async (codeToSearch) => {
     const code = codeToSearch || barcodeInput;
@@ -42,10 +51,7 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
     setIsAddedToast(false);
 
     try {
-      let res = await fetch(`${API_BASE}/api/nutrition/barcode/${encodeURIComponent(code)}`);
-      if (!res.ok) {
-        res = await fetch(`${API_BASE}/api/barcode?code=${encodeURIComponent(code)}`);
-      }
+      const res = await fetch(`${API_BASE}/api/barcode?code=${encodeURIComponent(code)}`);
       if (!res.ok) {
         throw new Error('Produkt konnte nicht gefunden werden oder Barcode ist ungültig.');
       }
@@ -417,11 +423,15 @@ export default function BarcodeScannerModal({ isOpen, onClose, onOpenMapWithStor
                     <AlertTriangle size={14} /> Erkannte Problemstoffe:
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    {productData.detectedToxins.map((toxin, i) => (
-                      <span key={i} className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-medium border border-rose-500/30">
-                        {toxin}
-                      </span>
-                    ))}
+                    {productData.detectedToxins.map((toxin, i) => {
+                      const label = typeof toxin === 'string' ? toxin : (toxin?.label || toxin?.name || toxin?.code || 'Zusatzstoff');
+                      const tip = typeof toxin === 'object' && toxin ? [toxin.risk, toxin.impact].filter(Boolean).join(' — ') : '';
+                      return (
+                        <span key={i} title={tip} className="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 text-xs font-medium border border-rose-500/30">
+                          {label}
+                        </span>
+                      );
+                    })}
                   </div>
                 </div>
               )}

@@ -5,10 +5,28 @@
 export function getBiochemicalProfile(item) {
   const name = (item.name || '').toLowerCase();
   const brand = (item.brand || item.producer || '').toLowerCase();
-  const baseKcal = Number(item.calories) || Number(item.nutrients?.calories?.match(/\d+/)?.[0]) || 150;
-  const baseProt = Number(item.protein) || Number(item.nutrients?.protein?.match(/[\d.]+/)?.[0]) || 5;
-  const baseFat = Number(item.fat) || Number(item.nutrients?.fat?.match(/[\d.]+/)?.[0]) || 5;
-  const baseCarbs = Number(item.carbs) || Number(item.nutrients?.carbs?.match(/[\d.]+/)?.[0]) || 15;
+  const rawKcal = Number(item.calories) || Number(item.nutrients?.calories?.match(/\d+/)?.[0]) || 150;
+  const rawProt = Number(item.protein) || Number(item.nutrients?.protein?.match(/[\d.]+/)?.[0]) || 5;
+  const rawFat = Number(item.fat) || Number(item.nutrients?.fat?.match(/[\d.]+/)?.[0]) || 5;
+  const rawCarbs = Number(item.carbs) || Number(item.nutrients?.carbs?.match(/[\d.]+/)?.[0]) || 15;
+
+  // Normalize serving-based catalog entries (e.g. "1 Steak (250g)" = 620 kcal) to true per-100g values!
+  let servingGrams = 100;
+  if (item.serving && typeof item.serving === 'string') {
+    const matches = [...item.serving.matchAll(/(\d+(?:[.,]\d+)?)\s*(?:g|ml)\b/gi)];
+    if (matches.length > 0) {
+      const sumGrams = matches.reduce((sum, m) => sum + (parseFloat(m[1].replace(',', '.')) || 0), 0);
+      if (sumGrams > 5 && sumGrams !== 100) {
+        servingGrams = sumGrams;
+      }
+    }
+  }
+
+  const normFactor = 100 / servingGrams;
+  const baseKcal = Math.round(rawKcal * normFactor);
+  const baseProt = Math.round(rawProt * normFactor * 10) / 10;
+  const baseFat = Math.round(rawFat * normFactor * 10) / 10;
+  const baseCarbs = Math.round(rawCarbs * normFactor * 10) / 10;
 
   // Derive kJ from kcal
   const kj = Math.round(baseKcal * 4.184);
@@ -49,8 +67,10 @@ export function getBiochemicalProfile(item) {
   let antiNutrients = null;
   let bioScore = 75;
 
-  // 1. Eier & Geflügel
-  if (name.includes('ei') || name.includes('egg') || name.includes('rührei') || name.includes('spiegelei')) {
+  const isEggItem = /(?:^|[\s,()/-])(ei|eier|hühnerei|freilandeier|bio-eier|rührei|spiegelei|eigelb|eiklar|egg|eggs)(?:$|[\s,()/-])/i.test(name);
+
+  // 1. Eier
+  if (isEggItem) {
     cholesterol = 370;
     saturatedFat = Math.round((baseFat * 0.3) * 10) / 10;
     sugar = 0.5;
@@ -158,7 +178,7 @@ export function getBiochemicalProfile(item) {
 
   // Smart Portions available for this item
   const smartPortions = [];
-  if (name.includes('ei') || name.includes('egg')) {
+  if (isEggItem) {
     smartPortions.push({ label: '1 Stück (48g)', grams: 48 });
     smartPortions.push({ label: '1 Großes (63g)', grams: 63 });
     smartPortions.push({ label: '1 Stück XL (73g)', grams: 73 });

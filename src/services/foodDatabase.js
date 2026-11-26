@@ -271,7 +271,20 @@ const FOOD_DATABASE = [
   }
 ];
 
-// Live FDDB Scraper Query (Fetches live catalog items from fddb.mobi)
+function decodeHtmlEntities(str) {
+  if (!str) return '';
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&#039;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&auml;/g, 'ä')
+    .replace(/&ouml;/g, 'ö')
+    .replace(/&uuml;/g, 'ü')
+    .replace(/&Auml;/g, 'Ä')
+    .replace(/&Ouml;/g, 'Ö')
+    .replace(/&Uuml;/g, 'Ü')
+    .replace(/&szlig;/g, 'ß');
+}
 function fetchFddbFoods(query) {
   return new Promise((resolve) => {
     if (!query || query.trim().length < 2) return resolve([]);
@@ -324,13 +337,16 @@ function fetchFddbFoods(query) {
             }
 
             if (nameMatch) {
-              const prodName = prodMatch ? `${prodMatch[1]} - ${nameMatch[1]}` : nameMatch[1];
+              const rawTitle = decodeHtmlEntities(nameMatch[1]);
+              const rawProd = prodMatch ? decodeHtmlEntities(prodMatch[1]) : '';
+              const prodName = rawProd ? `${rawProd} - ${rawTitle}` : rawTitle;
+              const derivedProt = Math.max(0, Math.round(((defaultCalories - (defaultFat * 9) - (defaultCarbs * 4)) / 4) * 10) / 10);
               items.push({
                 id: 'fddb_' + i + '_' + Date.now(),
                 name: prodName,
                 serving: defaultServing,
                 calories: defaultCalories,
-                protein: Math.round(((defaultCalories - (defaultFat * 9) - (defaultCarbs * 4)) / 4) * 10) / 10 || 5,
+                protein: derivedProt,
                 fat: defaultFat,
                 carbs: defaultCarbs,
                 image: thumbMatch ? thumbMatch[1] : null,
@@ -382,7 +398,43 @@ async function searchFoodDatabase(query) {
   return combined;
 }
 
+function calculateRemainingMacros(meals = [], userProfile = {}) {
+  const targetCalories = Number(userProfile.targetCalories || userProfile.customMacros?.calories) || 2400;
+  const targetProtein = Number(userProfile.customMacros?.protein) || Math.round((Number(userProfile.weightKg) || 80) * 2.2);
+  const targetFat = Number(userProfile.customMacros?.fat) || Math.round((Number(userProfile.weightKg) || 80) * 0.9);
+  const targetCarbs = Number(userProfile.customMacros?.carbs) || Math.max(0, Math.round((targetCalories - targetProtein * 4 - targetFat * 9) / 4));
+
+  const eatenCalories = meals.reduce((s, m) => s + (Number(m.calories) || 0), 0);
+  const eatenProtein = Math.round(meals.reduce((s, m) => s + (Number(m.protein) || 0), 0) * 10) / 10;
+  const eatenFat = Math.round(meals.reduce((sum, m) => sum + (Number(m.fat) || 0), 0) * 10) / 10;
+  const eatenCarbs = Math.round(meals.reduce((sum, m) => sum + (Number(m.carbs) || 0), 0) * 10) / 10;
+
+  return {
+    target: { calories: targetCalories, protein: targetProtein, fat: targetFat, carbs: targetCarbs },
+    eaten: { calories: eatenCalories, protein: eatenProtein, fat: eatenFat, carbs: eatenCarbs },
+    remaining: {
+      calories: Math.max(0, targetCalories - eatenCalories),
+      protein: Math.max(0, Math.round((targetProtein - eatenProtein) * 10) / 10),
+      fat: Math.max(0, Math.round((targetFat - eatenFat) * 10) / 10),
+      carbs: Math.max(0, Math.round((targetCarbs - eatenCarbs) * 10) / 10)
+    }
+  };
+}
+
+function generateDailyMetabolicSummary(meals = [], userProfile = {}) {
+  const stats = calculateRemainingMacros(meals, userProfile);
+  const cleanCount = meals.filter(m => m.isClean !== false).length;
+  const cleanRatio = meals.length > 0 ? Math.round((cleanCount / meals.length) * 100) : 100;
+  return {
+    ...stats,
+    mealsCount: meals.length,
+    cleanRatioPercent: cleanRatio
+  };
+}
+
 module.exports = {
   FOOD_DATABASE,
-  searchFoodDatabase
+  searchFoodDatabase,
+  calculateRemainingMacros,
+  generateDailyMetabolicSummary
 };

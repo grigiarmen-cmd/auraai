@@ -15,7 +15,6 @@ function callGeminiMedical(prompt, apiKey) {
       hostname: "generativelanguage.googleapis.com",
       path: `/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       method: "POST",
-      rejectUnauthorized: false,
       timeout: 12000,
       headers: {
         "Content-Type": "application/json",

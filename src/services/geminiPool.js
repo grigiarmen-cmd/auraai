@@ -98,7 +98,7 @@ Gib AUSSCHLIESSLICH das valide JSON ohne Markdown-Tags zurück.`;
     // Fallback: If Gemini keys failed or missing, use Groq Vision Llama 3.2 11B Vision
     try {
       const groqManager = require('./groqService');
-      const groqResult = await groqManager.analyzeImage(cleanBase64, prompt);
+      const groqResult = await groqManager.visionAnalysis(cleanBase64, prompt);
       const cleanGroq = groqResult.replace(/```json/gi, '').replace(/```/g, '').trim();
       const match = cleanGroq.match(/\{[\s\S]*\}/);
       if (match) {

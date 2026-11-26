@@ -5,6 +5,7 @@
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
+    "server": "node --use-system-ca aura_server.js",
     "build": "vite build",
     "start": "electron .",
     "dist": "vite build && electron-builder --win --dir"

@@ -12,7 +12,8 @@ export default function CalorieTrackerModal({
   isOpen, 
   onClose,
   onOpenBarcodeScanner,
-  onOpenMealVision 
+  onOpenMealVision,
+  onOpenProfile
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -41,15 +42,80 @@ export default function CalorieTrackerModal({
   const [aiFoodText, setAiFoodText] = useState('');
   const [isAiListening, setIsAiListening] = useState(false);
   const [isAiProcessing, setIsAiProcessing] = useState(false);
+  const aiSpeechRef = useRef(null);
 
-  // Live Fasting Timer State
-  const [fastingSeconds, setFastingSeconds] = useState(55903); // starts around 15:31:43
+  // Real Persistent Fasting Timer State
+  const [fastingStartMs, setFastingStartMs] = useState(() => {
+    try {
+      const saved = Number(localStorage.getItem('aura_fasting_start'));
+      if (saved && saved > 0) return saved;
+      const initial = Date.now();
+      localStorage.setItem('aura_fasting_start', String(initial));
+      return initial;
+    } catch (e) {
+      return Date.now();
+    }
+  });
+  const [fastingSeconds, setFastingSeconds] = useState(() => Math.max(0, Math.floor((Date.now() - fastingStartMs) / 1000)));
+
   useEffect(() => {
-    const timer = setInterval(() => {
-      setFastingSeconds(prev => prev + 1);
-    }, 1000);
+    const updateTimer = () => setFastingSeconds(Math.max(0, Math.floor((Date.now() - fastingStartMs) / 1000)));
+    updateTimer();
+    const timer = setInterval(updateTimer, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [fastingStartMs]);
+
+  const resetFastingTimer = () => {
+    const now = Date.now();
+    setFastingStartMs(now);
+    setFastingSeconds(0);
+    try { localStorage.setItem('aura_fasting_start', String(now)); } catch (e) {}
+  };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (editingMeal) setEditingMeal(null);
+        else if (activeItemForDetail) { setActiveItemForDetail(null); setActiveProfile(null); }
+        else if (activeSubView !== 'dashboard') setActiveSubView('dashboard');
+        else onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose, editingMeal, activeItemForDetail, activeSubView]);
+
+  const toggleAiVoiceDictation = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setIsAiListening(false);
+      return;
+    }
+    if (isAiListening && aiSpeechRef.current) {
+      aiSpeechRef.current.stop();
+      setIsAiListening(false);
+      return;
+    }
+    try {
+      const rec = new SpeechRecognition();
+      rec.lang = 'de-DE';
+      rec.continuous = false;
+      rec.interimResults = true;
+      rec.onresult = (ev) => {
+        let t = '';
+        for (let i = ev.resultIndex; i < ev.results.length; i++) t += ev.results[i][0].transcript;
+        setAiFoodText(t);
+      };
+      rec.onerror = () => setIsAiListening(false);
+      rec.onend = () => setIsAiListening(false);
+      aiSpeechRef.current = rec;
+      rec.start();
+      setIsAiListening(true);
+    } catch (e) {
+      setIsAiListening(false);
+    }
+  };
 
   const formatFastingTime = (totalSec) => {
     const hrs = Math.floor(totalSec / 3600);
@@ -87,30 +153,36 @@ export default function CalorieTrackerModal({
 
   const currentDateKey = getTargetDateKey(dayOffset);
 
-  // Daily Log State
+  // Daily Log State (no fake pre-seeded meals!)
   const [dailyEntries, setDailyEntries] = useState(() => {
     try {
       const saved = localStorage.getItem(`aura_meals_${currentDateKey}`);
       if (saved) return JSON.parse(saved);
     } catch(e) {}
-    return dayOffset === 0 ? [
-      { id: '1', name: '3 Rühreier in Weidebutter', category: 'Frühstück', amount: '1 Portion (180g)', calories: 340, protein: 21, fat: 28, carbs: 1.5, time: '08:30' }
-    ] : [];
+    return [];
   });
 
-  // Reload entries when day changes OR when external meal is logged
+  // Read Bloodwork & User Profile dynamically whenever modal opens
+  const [bloodReport, setBloodReport] = useState(null);
+  const [userProfile, setUserProfile] = useState({ targetCalories: 2400, weightKg: 80 });
+
+  // Reload entries & profile when day changes OR modal opens OR external meal is logged
   useEffect(() => {
     const loadEntries = () => {
       try {
         const saved = localStorage.getItem(`aura_meals_${currentDateKey}`);
-        if (saved) {
-          setDailyEntries(JSON.parse(saved));
-        } else {
-          setDailyEntries([]);
-        }
+        setDailyEntries(saved ? JSON.parse(saved) : []);
       } catch(e) {
         setDailyEntries([]);
       }
+      try {
+        const b = localStorage.getItem('aura_latest_bloodwork');
+        setBloodReport(b ? JSON.parse(b) : null);
+      } catch(e) {}
+      try {
+        const p = localStorage.getItem('aura_user_profile');
+        if (p) setUserProfile(JSON.parse(p));
+      } catch(e) {}
     };
 
     loadEntries();
@@ -128,24 +200,6 @@ export default function CalorieTrackerModal({
       window.removeEventListener('aura_meals_updated', handleStorageUpdate);
     };
   }, [currentDateKey, isOpen]);
-
-  // Read Bloodwork to provide smart recommendations in search
-  const [bloodReport] = useState(() => {
-    try {
-      const b = localStorage.getItem('aura_latest_bloodwork');
-      if (b) return JSON.parse(b);
-    } catch(e) {}
-    return null;
-  });
-
-  // User Profile Target
-  const [userProfile] = useState(() => {
-    try {
-      const p = localStorage.getItem('aura_user_profile');
-      if (p) return JSON.parse(p);
-    } catch(e) {}
-    return { targetCalories: 2400, weightKg: 80 };
-  });
 
   useEffect(() => {
     try {
@@ -361,7 +415,14 @@ export default function CalorieTrackerModal({
             <span className="text-xs font-semibold text-purple-200">Fasten</span>
             <span className="text-xs font-mono font-bold text-white tracking-wide">{formatFastingTime(fastingSeconds)}</span>
           </div>
-          <ChevronRight size={16} className="text-purple-400/80" />
+          <button
+            type="button"
+            onClick={resetFastingTimer}
+            className="text-[11px] font-semibold text-purple-300 hover:text-white bg-purple-500/20 hover:bg-purple-500/30 border border-purple-400/30 px-2.5 py-1 rounded-lg transition-colors"
+            title="Fasten-Timer neu starten"
+          >
+            Neustart
+          </button>
         </div>
 
         {/* 1. FDDB-Authentic Dashboard Card */}
@@ -381,13 +442,17 @@ export default function CalorieTrackerModal({
           </div>
 
           {/* Slide 0: The Classic Circular Arc Layout matching FDDB */}
-          {dashboardSlide === 0 && (
+          {dashboardSlide === 0 && (() => {
+            const targetProt = Number(userProfile?.customMacros?.protein) || Math.round((Number(userProfile?.weightKg) || 80) * 2.2);
+            const targetFat = Number(userProfile?.customMacros?.fat) || Math.round((Number(userProfile?.weightKg) || 80) * 0.9);
+            const targetCarbs = Number(userProfile?.customMacros?.carbs) || Math.max(20, Math.round((calorieTarget - targetProt * 4 - targetFat * 9) / 4));
+            return (
             <div className="space-y-4 animate-in fade-in duration-200">
               
               {/* Central Speedometer Row with perfect symmetry */}
               <div className="grid grid-cols-3 items-center text-center">
                 
-                {/* Left: 2.194 gegessen / 100% erreicht */}
+                {/* Left: gegessen / % erreicht */}
                 <div className="flex flex-col items-center justify-center">
                   <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">{totalCalories}</span>
                   <span className="text-[11px] text-zinc-400 font-medium">gegessen</span>
@@ -429,7 +494,7 @@ export default function CalorieTrackerModal({
                   </div>
                 </div>
 
-                {/* Right: 0 verbrannt / 2.200 Ziel */}
+                {/* Right: 0 verbrannt / Ziel */}
                 <div className="flex flex-col items-center justify-center">
                   <span className="text-xl sm:text-2xl font-black text-white font-mono tracking-tight">0</span>
                   <span className="text-[11px] text-zinc-400 font-medium">verbrannt</span>
@@ -449,10 +514,10 @@ export default function CalorieTrackerModal({
                   <div className="w-full max-w-[80px] h-1.5 rounded-full bg-[#2a1c22] overflow-hidden mb-1">
                     <div 
                       className="h-full rounded-full bg-[#f87171] transition-all duration-500"
-                      style={{ width: `${Math.min(100, (totalFat / 60) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (totalFat / Math.max(1, targetFat)) * 100)}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-zinc-400 font-mono">{totalFat}/60 g</span>
+                  <span className="text-[11px] text-zinc-400 font-mono">{totalFat}/{targetFat} g</span>
                 </div>
 
                 {/* KH */}
@@ -461,10 +526,10 @@ export default function CalorieTrackerModal({
                   <div className="w-full max-w-[80px] h-1.5 rounded-full bg-[#2d2516] overflow-hidden mb-1">
                     <div 
                       className="h-full rounded-full bg-[#fbbf24] transition-all duration-500"
-                      style={{ width: `${Math.min(100, (totalCarbs / 390) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (totalCarbs / Math.max(1, targetCarbs)) * 100)}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-zinc-400 font-mono">{totalCarbs}/390 g</span>
+                  <span className="text-[11px] text-zinc-400 font-mono">{totalCarbs}/{targetCarbs} g</span>
                 </div>
 
                 {/* Protein */}
@@ -473,15 +538,16 @@ export default function CalorieTrackerModal({
                   <div className="w-full max-w-[80px] h-1.5 rounded-full bg-[#182a22] overflow-hidden mb-1">
                     <div 
                       className="h-full rounded-full bg-[#4ade80] transition-all duration-500"
-                      style={{ width: `${Math.min(100, (totalProtein / 130) * 100)}%` }}
+                      style={{ width: `${Math.min(100, (totalProtein / Math.max(1, targetProt)) * 100)}%` }}
                     />
                   </div>
-                  <span className="text-[11px] text-zinc-400 font-mono">{totalProtein}/130 g</span>
+                  <span className="text-[11px] text-zinc-400 font-mono">{totalProtein}/{targetProt} g</span>
                 </div>
               </div>
 
             </div>
-          )}
+            );
+          })()}
 
           {/* Slide 1: Pure Grams & Kcal Display */}
           {dashboardSlide === 1 && (
@@ -505,27 +571,33 @@ export default function CalorieTrackerModal({
             </div>
           )}
 
-          {/* Slide 2: Electrolytes & Hydration (Salz, Kalium, Wasser, Gesättigt) */}
-          {dashboardSlide === 2 && (
-            <div className="grid grid-cols-4 gap-2 text-center py-2 animate-in fade-in duration-200">
-              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
-                <span className="text-xl font-black text-cyan-300 font-mono">6.2 g</span>
-                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Meersalz</span>
+          {/* Slide 2: Dynamic Electrolytes & Saturated Fat */}
+          {dashboardSlide === 2 && (() => {
+            const estSatFat = Math.round(totalFat * 0.42 * 10) / 10;
+            const estPotassiumG = Math.round(((totalCalories / 1000) * 1.4) * 10) / 10;
+            const estSaltG = Math.round(((totalCalories / 1000) * 2.1) * 10) / 10;
+            const targetWaterL = Math.round(((Number(userProfile?.weightKg) || 80) * 0.035) * 10) / 10;
+            return (
+              <div className="grid grid-cols-4 gap-2 text-center py-2 animate-in fade-in duration-200">
+                <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                  <span className="text-xl font-black text-cyan-300 font-mono">{estSaltG} g</span>
+                  <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Salz (gesch.)</span>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                  <span className="text-xl font-black text-purple-300 font-mono">{estPotassiumG} g</span>
+                  <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Kalium (gesch.)</span>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                  <span className="text-xl font-black text-blue-400 font-mono">{targetWaterL} L</span>
+                  <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Wasser-Ziel</span>
+                </div>
+                <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
+                  <span className="text-xl font-black text-amber-300 font-mono">{estSatFat} g</span>
+                  <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Gesätt. Fett</span>
+                </div>
               </div>
-              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
-                <span className="text-xl font-black text-purple-300 font-mono">3.8 g</span>
-                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Kalium</span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
-                <span className="text-xl font-black text-blue-400 font-mono">2.4 L</span>
-                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Wasser</span>
-              </div>
-              <div className="p-2.5 rounded-2xl bg-[#141824] border border-zinc-800/80">
-                <span className="text-xl font-black text-amber-300 font-mono">28 g</span>
-                <span className="text-[10px] text-zinc-400 block mt-1 font-medium">Gesätt. Fett</span>
-              </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Slide 3: Formula Equation: Ziel - Gegessen + Verbrannt = Übrig */}
           {dashboardSlide === 3 && (
@@ -936,11 +1008,13 @@ export default function CalorieTrackerModal({
 
             return (
               <div key={category} className="rounded-2xl bg-[#0d0f17] border border-zinc-800/80 overflow-hidden">
-                {/* Category Header */}
-                <button
-                  type="button"
+                {/* Category Header (div role=button to avoid invalid nested button HTML) */}
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => toggleCategory(category)}
-                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-zinc-900/40 hover:bg-zinc-900/60 transition-colors text-left"
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleCategory(category); }}
+                  className="w-full px-3.5 py-2.5 flex items-center justify-between bg-zinc-900/40 hover:bg-zinc-900/60 transition-colors text-left cursor-pointer"
                 >
                   <div className="flex items-center gap-2">
                     {isOpen ? <ChevronUp size={15} className="text-sky-400" /> : <ChevronDown size={15} className="text-zinc-500" />}
@@ -967,7 +1041,7 @@ export default function CalorieTrackerModal({
                       <Plus size={14} />
                     </button>
                   </div>
-                </button>
+                </div>
 
                 {/* Meals under category */}
                 {isOpen && (
@@ -1039,7 +1113,7 @@ export default function CalorieTrackerModal({
                 type="button"
                 onClick={() => {
                   setIsFabOpen(false);
-                  alert("Körperwerte-Tracking: Gewicht, KFA & Biomarker werden synchronisiert.");
+                  if (onOpenProfile) onOpenProfile();
                 }}
                 className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
               >
@@ -1052,7 +1126,7 @@ export default function CalorieTrackerModal({
                 type="button"
                 onClick={() => {
                   setIsFabOpen(false);
-                  alert("Aktivität & Kalorienverbrauch werden erfasst.");
+                  if (onOpenProfile) onOpenProfile();
                 }}
                 className="h-10 px-4 rounded-full bg-[#1e4a7a] hover:bg-[#255c99] text-white font-medium text-xs flex items-center gap-2.5 shadow-lg shadow-black/60 transition-all border border-sky-400/20 active:scale-95"
               >
@@ -1175,7 +1249,7 @@ export default function CalorieTrackerModal({
                     type="button"
                     onClick={() => {
                       setAiInputMode('voice');
-                      setIsAiListening(!isAiListening);
+                      toggleAiVoiceDictation();
                     }}
                     className={`h-11 px-5 rounded-full font-semibold text-xs flex items-center gap-3 transition-all ${
                       isAiListening
@@ -1243,7 +1317,7 @@ export default function CalorieTrackerModal({
                     </button>
                     <button 
                       type="button" 
-                      onClick={() => setIsAiListening(!isAiListening)}
+                      onClick={toggleAiVoiceDictation}
                       className={`hover:text-white ${isAiListening ? 'text-rose-400' : ''}`}
                       title="Spracheingabe"
                     >

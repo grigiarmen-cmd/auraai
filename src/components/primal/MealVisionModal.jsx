@@ -31,8 +31,17 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion, onAdd
       setError(null);
       setUserNote('');
       setIsLiveCameraActive(false);
+      return;
     }
-  }, [isOpen]);
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        stopCamera();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   const stopCamera = () => {
     if (streamRef.current) {
@@ -69,7 +78,7 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion, onAdd
       }, 100);
     } catch (err) {
       console.warn("Live camera start failed, falling back to native file capture:", err);
-      // Fallback: trigger native Android camera capture directly
+      setError('Live-Kamera nicht verfügbar — bitte wähle ein Foto aus deiner Galerie oder erlaube den Kamerazugriff.');
       if (fileInputCaptureRef.current) {
         fileInputCaptureRef.current.click();
       }
@@ -122,30 +131,22 @@ export default function MealVisionModal({ isOpen, onClose, onSaveToNotion, onAdd
     setAnalysisResult(null);
 
     try {
-      let res = await fetch(`${API_BASE}/api/nutrition/analyze-meal`, {
+      const finalNote = scanMode === 'restaurant_menu'
+        ? `[RESTAURANT SPEISEKARTEN SCAN: Bitte analysiere alle Gerichte auf dieser Speisekarte und markiere mit grünem Glow das am wenigsten denaturierte, saatölfreie und gesündeste Primal-Gericht!] ${userNote}`
+        : userNote;
+
+      const res = await fetch(`${API_BASE}/api/analyze-meal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           imageBase64: selectedImage,
-          note: scanMode === 'restaurant_menu' 
-            ? `[RESTAURANT SPEISEKARTEN SCAN: Bitte analysiere alle Gerichte auf dieser Speisekarte und markiere mit grünem Glow das am wenigsten denaturierte, saatölfreie und gesündeste Primal-Gericht!] ${userNote}`
-            : userNote
+          note: finalNote
         })
       });
 
       if (!res.ok) {
-        res = await fetch(`${API_BASE}/api/analyze-meal`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            imageBase64: selectedImage,
-            note: userNote
-          })
-        });
-      }
-
-      if (!res.ok) {
-        throw new Error('Analyse fehlgeschlagen');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Analyse fehlgeschlagen');
       }
 
       const data = await res.json();

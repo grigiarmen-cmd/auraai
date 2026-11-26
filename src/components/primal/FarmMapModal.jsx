@@ -7,10 +7,15 @@ export default function FarmMapModal({ isOpen, onClose, initialQuery }) {
   const [filter, setFilter] = useState('all'); // 'all' | 'raw_milk' | 'bio_market' | 'supermarket'
   const [locations, setLocations] = useState({ verifiedFarms: [], nearbyStores: [] });
   const [isLoading, setIsLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [userCoords, setUserCoords] = useState({ lat: 54.54, lon: 9.40 }); // Default Jübek / Norddeutschland
 
   useEffect(() => {
     if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
 
     // Get user geolocation if available
     if (navigator.geolocation) {
@@ -23,23 +28,32 @@ export default function FarmMapModal({ isOpen, onClose, initialQuery }) {
         },
         () => {
           fetchLocations(userCoords.lat, userCoords.lon);
-        }
+        },
+        { timeout: 4000 }
       );
     } else {
       fetchLocations(userCoords.lat, userCoords.lon);
     }
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [isOpen]);
 
   const fetchLocations = async (lat, lon) => {
     setIsLoading(true);
+    setFetchError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/locations/nearby?lat=${lat}&lon=${lon}&radius=6000`);
+      const res = await fetch(`${API_BASE}/api/locations/nearby?lat=${lat}&lon=${lon}&radius=15000`);
       if (res.ok) {
         const data = await res.json();
-        setLocations(data);
+        setLocations({
+          verifiedFarms: Array.isArray(data.verifiedFarms) ? data.verifiedFarms : [],
+          nearbyStores: Array.isArray(data.nearbyStores) ? data.nearbyStores : []
+        });
+      } else {
+        setFetchError(`Standortdaten konnten nicht geladen werden (HTTP ${res.status}).`);
       }
     } catch (e) {
       console.error("Locations error:", e);
+      setFetchError('Netzwerkfehler beim Laden der Standorte.');
     } finally {
       setIsLoading(false);
     }
@@ -111,6 +125,16 @@ export default function FarmMapModal({ isOpen, onClose, initialQuery }) {
             <div className="py-16 text-center space-y-4">
               <div className="w-10 h-10 mx-auto border-3 border-emerald-500 border-t-transparent rounded-full animate-spin" />
               <p className="text-xs text-zinc-400">Lade Standorte & Entfernungen im Umkreis...</p>
+            </div>
+          ) : fetchError ? (
+            <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs text-center space-y-2">
+              <p>{fetchError}</p>
+              <button
+                onClick={() => fetchLocations(userCoords.lat, userCoords.lon)}
+                className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white font-semibold"
+              >
+                Erneut versuchen
+              </button>
             </div>
           ) : allListings.length === 0 ? (
             <div className="py-16 text-center text-zinc-400 text-xs">

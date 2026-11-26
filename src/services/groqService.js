@@ -1,7 +1,6 @@
 // Multi-Key Groq API Rotation Service (Llama 3.3 70B Versatile & Llama 3.2 11B Vision)
 // Automatically falls back and rotates through all provided Groq keys upon rate limits (429) or quota errors.
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const https = require('https');
 
 class GroqKeyManager {
@@ -27,39 +26,44 @@ class GroqKeyManager {
   }
 
   rotateKey() {
+    if (this.keys.length === 0) return null;
     this.currentIndex = (this.currentIndex + 1) % this.keys.length;
     console.log(`🔄 Groq Rate-Limit! Switched to Key #${this.currentIndex + 1}`);
     return this.getCurrentKey();
   }
 
-  // Call Groq Chat Completion with auto-retry across all keys
+  // Call Groq Chat Completion with auto-retry across all keys & model fallback
   async chatCompletion(messages, model = 'openai/gpt-oss-120b', temperature = 0.7) {
-    let attempts = 0;
-    const maxAttempts = this.keys.length * 2;
+    if (this.keys.length === 0) throw new Error('Keine Groq API Keys konfiguriert');
+    const modelsToTry = [model, 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'].filter((v, i, a) => v && a.indexOf(v) === i);
+    let lastErr = null;
 
-    while (attempts < maxAttempts) {
-      const apiKey = this.getCurrentKey();
-      try {
-        const result = await this._makeRequest(apiKey, {
-          model: model,
-          messages: messages,
-          temperature: temperature,
-          max_tokens: 1500
-        });
-        return result;
-      } catch (err) {
-        attempts++;
-        console.warn(`⚠️ Groq Key #${this.currentIndex + 1} failed: ${err.message}. Rotating...`);
-        this.rotateKey();
-        if (attempts >= maxAttempts) {
-          throw new Error(`Alle Groq API Keys erschöpft: ${err.message}`);
+    for (const activeModel of modelsToTry) {
+      for (let i = 0; i < this.keys.length; i++) {
+        const apiKey = this.getCurrentKey();
+        try {
+          return await this._makeRequest(apiKey, {
+            model: activeModel,
+            messages,
+            temperature,
+            max_tokens: 1500
+          });
+        } catch (err) {
+          lastErr = err;
+          if (/model.*does not exist|model_not_found|decommissioned/i.test(err.message)) {
+            break; // switch to next model immediately
+          }
+          console.warn(`⚠️ Groq Key #${this.currentIndex + 1} failed: ${err.message}. Rotating...`);
+          this.rotateKey();
         }
       }
     }
+    throw new Error(`Alle Groq API Keys erschöpft: ${lastErr ? lastErr.message : 'Unbekannter Fehler'}`);
   }
 
-  // Vision Analysis with Llama 3.2 11B Vision
+  // Vision Analysis with Llama 4 Scout Vision
   async visionAnalysis(imageBase64, promptText) {
+    if (this.keys.length === 0) throw new Error('Keine Groq API Keys konfiguriert');
     let attempts = 0;
     const maxAttempts = this.keys.length * 2;
 
@@ -85,7 +89,7 @@ class GroqKeyManager {
       const apiKey = this.getCurrentKey();
       try {
         const result = await this._makeRequest(apiKey, {
-          model: 'llama-3.2-11b-vision-preview',
+          model: 'meta-llama/llama-4-scout-17b-16e-instruct',
           messages: messages,
           temperature: 0.2,
           max_tokens: 1200

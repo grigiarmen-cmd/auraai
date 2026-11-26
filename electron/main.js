@@ -2,13 +2,11 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, session, globalShortcut, s
 const path = require('path');
 const { fork } = require('child_process');
 
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-
 let mainWindow;
 let serverProcess;
 
 ipcMain.on('open-external-url', (event, url) => {
-  if (url) {
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) {
     console.log("Opening external URL via shell:", url);
     shell.openExternal(url);
   }
@@ -17,16 +15,15 @@ ipcMain.on('open-external-url', (event, url) => {
 function startBackendServer() {
   try {
     const fs = require('fs');
-    let serverPath = path.join(__dirname, '../aura_server.js');
-    if (!fs.existsSync(serverPath)) {
-      serverPath = 'e:\\antigravity\\dcai\\aura_server.js';
-    }
-    const nodeModulesPath = 'e:\\antigravity\\dcai\\node_modules';
+    const rootDir = path.resolve(__dirname, '..');
+    const serverPath = path.join(rootDir, 'aura_server.js');
+    const nodeModulesPath = path.join(rootDir, 'node_modules');
+    if (!fs.existsSync(serverPath)) return;
     serverProcess = fork(serverPath, [], {
+      execArgv: ['--use-system-ca'],
       env: { 
         ...process.env, 
-        PORT: 3001, 
-        NODE_TLS_REJECT_UNAUTHORIZED: '0',
+        PORT: 3001,
         NODE_PATH: nodeModulesPath
       }
     });

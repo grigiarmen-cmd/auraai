@@ -1,4 +1,5 @@
 const { authenticateUser } = require('../src/services/accountStorage');
+const { createSessionToken } = require('../src/services/authService');
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,10 +21,12 @@ module.exports = async (req, res) => {
     }
 
     const profile = await authenticateUser(email, password);
+    const token = createSessionToken(email);
 
     return res.status(200).json({
       success: true,
       message: 'Erfolgreich angemeldet!',
+      token,
       user: {
         email,
         profile

@@ -9,8 +9,8 @@ async function fetchOpenFoodFacts(barcode) {
   return new Promise((resolve) => {
     const url = `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json`;
     
-    https.get(url, { 
-      rejectUnauthorized: false,
+    const req = https.get(url, { 
+      timeout: 5000,
       headers: { 'User-Agent': 'AuraAI-NutritionApp/1.0 (contact@aura-ai.internal)' } 
     }, (res) => {
       let data = '';
@@ -27,10 +27,101 @@ async function fetchOpenFoodFacts(barcode) {
           resolve(null);
         }
       });
-    }).on('error', (err) => {
+    });
+
+    req.on('error', (err) => {
       console.error("OpenFoodFacts HTTPS error:", err.message);
       resolve(null);
     });
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+  });
+}
+
+// Haversine distance in km
+function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+  if ([lat1, lon1, lat2, lon2].some(v => typeof v !== 'number' || Number.isNaN(v))) return 0;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
+}
+
+// Query OpenStreetMap Overpass API for nearby organic stores, farm shops, milk vending machines & supermarkets
+function queryNearbyStores(lat, lon, radius = 15000) {
+  return new Promise((resolve) => {
+    const safeRadius = Math.min(Math.max(Number(radius) || 15000, 1000), 30000);
+    const overpassQuery = `[out:json][timeout:6];(node["shop"~"organic|farm|health_food|supermarket"](around:${safeRadius},${lat},${lon});node["amenity"="vending_machine"]["vending"="milk"](around:${safeRadius},${lat},${lon}););out body 25;`;
+    const postData = `data=${encodeURIComponent(overpassQuery)}`;
+
+    const req = https.request({
+      hostname: 'overpass-api.de',
+      path: '/api/interpreter',
+      method: 'POST',
+      timeout: 6500,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Content-Length': Buffer.byteLength(postData),
+        'User-Agent': 'AuraAI-Locator/1.0'
+      }
+    }, (res) => {
+      if (res.statusCode !== 200) return resolve([]);
+      let body = '';
+      res.on('data', chunk => { body += chunk; });
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(body);
+          const elements = Array.isArray(json.elements) ? json.elements : [];
+          const mapped = elements
+            .filter(el => el.tags && (el.tags.name || el.tags.vending === 'milk'))
+            .map((el, idx) => {
+              const tags = el.tags || {};
+              const shop = tags.shop || '';
+              const isMilk = tags.vending === 'milk';
+              const isOrganic = shop === 'organic' || shop === 'health_food' || /bio|denns|alnatura|reformhaus|demeter|bioladen/i.test(tags.name || '');
+              const isFarm = shop === 'farm' || isMilk;
+              const street = [tags['addr:street'], tags['addr:housenumber']].filter(Boolean).join(' ');
+              const city = [tags['addr:postcode'], tags['addr:city']].filter(Boolean).join(' ');
+              const address = [street, city].filter(Boolean).join(', ') || 'In deiner Umgebung';
+
+              return {
+                id: `osm_${el.id || idx}`,
+                name: tags.name || (isMilk ? 'Milchtankstelle / Rohmilchautomat' : 'Lebensmittelmarkt'),
+                type: isFarm ? 'farm' : (isOrganic ? 'bio_market' : 'supermarket'),
+                category: isMilk || isFarm ? 'raw_milk' : (isOrganic ? 'bio_market' : 'supermarket'),
+                lat: el.lat,
+                lon: el.lon,
+                distanceKm: calculateDistanceKm(lat, lon, el.lat, el.lon),
+                address,
+                products: isFarm
+                  ? ['Hofladen / Direktvermarktung', 'Regionale Erzeugnisse']
+                  : isOrganic
+                    ? ['Bio-Vollsortiment', 'Weideprodukte', 'Rohmilchkäse']
+                    : ['Bio-Eigenmarke', 'Weidebutter', 'Eier aus Freiland/Bio'],
+                verified: isFarm || isOrganic
+              };
+            })
+            .sort((a, b) => a.distanceKm - b.distanceKm)
+            .slice(0, 20);
+          resolve(mapped);
+        } catch (e) {
+          resolve([]);
+        }
+      });
+    });
+
+    req.on('error', () => resolve([]));
+    req.on('timeout', () => { req.destroy(); resolve([]); });
+    req.write(postData);
+    req.end();
   });
 }
 
@@ -89,54 +180,60 @@ async function generateDeepScienceAnalysis(productName, ingredientsText, detecte
     };
   }
 
-  // 2. DYNAMISCHE KALKULATION BASIEREND AUF INHALTSSTOFFEN
-  const hasSeedOils = detectedToxins.some(t => t.type === 'SEED_OIL') || /rapsöl|sonnenblumenöl|palmöl|sojaöl|pflanzenöl/i.test(ingr);
-  const hasChemicalAdditives = detectedToxins.some(t => t.type === 'ADDITIVE') || /e\d{3}|emulgator|aroma|konservier|geschmacksverstärker/i.test(ingr);
-  const hasRefinedSugar = /zucker|glukosesirup|fruktosesirup|dextrose/i.test(ingr) && !/honig|apfel|mango/i.test(pName);
-  
-  // Clean indicators
-  const isMeatOrFish = /fleisch|rind|schwein|schinken|prosciutto|lachs|fisch|steak|hack/i.test(pName);
-  const isEgg = /ei|eier|egg/i.test(pName);
-  const isRawHoney = /honig|honey/i.test(pName);
-  const isFruit = /mango|apfel|beere|banane|frucht/i.test(pName);
+  // 2. DYNAMISCHE KALKULATION BASIEREND AUF INHALTSSTOFFEN (Deutsch + Englisch + Französisch)
+  const hasSeedOils = detectedToxins.some(t => t && (t.type === 'SEED_OIL' || /öl|oil/i.test(String(t)))) ||
+    /rapsöl|rapeseed|canola|sonnenblumenöl|sunflower|palmöl|palmfett|palm oil|huile de palme|sojaöl|soybean|distelöl|safflower|maiskeimöl|corn oil|cottonseed|baumwollsaatöl|pflanzenöl|pflanzliches öl|pflanzenfett|vegetable oil|margarine/i.test(ingr);
+  const hasChemicalAdditives = detectedToxins.some(t => t && t.type === 'ADDITIVE') ||
+    /\be\s?\d{3}[a-z]?\b|emulgator|emulsifier|lecithin|sojalecithin|vanillin|aroma|flavouring|flavoring|konservier|preservative|geschmacksverstärker|carrageen|maltodextrin|sucralose|aspartam/i.test(ingr);
+  const hasRefinedSugar = /zucker|sugar|sucre|glukosesirup|glucose syrup|fruktosesirup|fructose|dextrose|invertzucker/i.test(ingr) && !/\b(rohhonig|blütenhonig|raw honey)\b/i.test(pName);
 
-  let calculatedScore = 75;
+  // Clean indicators (strict word boundaries for German 'ei')
+  const isMeatOrFish = /fleisch|rind|schwein|schinken|prosciutto|lachs|fisch|steak|hack|hähnchen|pute|wildlachs|forelle|thunfisch/i.test(pName);
+  const isEgg = /(?:^|[\s,()/-])(ei|eier|hühnerei|freilandeier|bio-eier|rührei|spiegelei|eigelb|eiklar|egg|eggs)(?:$|[\s,()/-])/i.test(pName);
+  const isRawHoney = /\bhonig\b|\bhoney\b/i.test(pName);
+  const isFruit = /\b(mango|mangos|apfel|äpfel|beere|beeren|blaubeeren|erdbeeren|himbeeren|banane|bananen|obst|mandarine|orange)\b/i.test(pName);
+
+  let calculatedScore = 82;
   let calculatedVerdict = "QUESTIONABLE";
 
-  if (hasSeedOils) calculatedScore -= 35;
+  if (hasSeedOils) calculatedScore -= 40;
   if (hasChemicalAdditives) calculatedScore -= 20;
-  if (hasRefinedSugar) calculatedScore -= 25;
+  if (hasRefinedSugar) calculatedScore -= 30;
 
-  if (isMeatOrFish && !hasSeedOils && !hasChemicalAdditives) {
-    calculatedScore = 92;
+  const isTrulyClean = !hasSeedOils && !hasChemicalAdditives && !hasRefinedSugar;
+
+  if (isMeatOrFish && isTrulyClean) {
+    calculatedScore = 94;
     calculatedVerdict = "PRIMAL_APPROVED";
-  } else if (isEgg) {
+  } else if (isEgg && isTrulyClean) {
     calculatedScore = 96;
     calculatedVerdict = "PRIMAL_APPROVED";
-  } else if (isRawHoney) {
-    calculatedScore = 98;
+  } else if (isRawHoney && !hasSeedOils && !hasChemicalAdditives) {
+    calculatedScore = 96;
     calculatedVerdict = "PRIMAL_APPROVED";
-  } else if (isFruit && !hasChemicalAdditives) {
-    calculatedScore = 90;
+  } else if (isFruit && isTrulyClean) {
+    calculatedScore = 92;
     calculatedVerdict = "PRIMAL_APPROVED";
-  } else if (calculatedScore >= 75) {
+  } else if (calculatedScore >= 80 && isTrulyClean) {
     calculatedVerdict = "PRIMAL_APPROVED";
-  } else if (calculatedScore <= 40) {
+  } else if (calculatedScore <= 45) {
     calculatedVerdict = "TOXIC";
   }
 
   // Bound score
   calculatedScore = Math.max(5, Math.min(99, calculatedScore));
 
-  // Dynamische Zutaten-Zerlegung
+  // Dynamische Zutaten-Zerlegung (Deutsch + Englisch, schützt Dezimalkommas wie "8,7 %")
   let realBreakdown = [];
   if (ingredientsText && ingredientsText.trim().length > 0) {
-    const rawParts = ingredientsText.split(/[,;•\n]/).map(s => s.trim()).filter(s => s.length > 2 && !/serviervorschlag|suggestion/i.test(s));
-    realBreakdown = rawParts.slice(0, 8).map(part => {
+    const normalizedIngr = ingredientsText.replace(/(\d),(\d)/g, '$1.$2');
+    const rawParts = normalizedIngr.split(/[,;•\n]/).map(s => s.trim()).filter(s => s.length > 2 && !/serviervorschlag|suggestion/i.test(s));
+    realBreakdown = rawParts.slice(0, 10).map(part => {
       const lower = part.toLowerCase();
-      const isBadOil = /raps|sonnenblume|palm|soja|öl|fett/i.test(lower);
-      const isBadSugar = /zucker|sirup|dextrose/i.test(lower);
-      const isBadAdd = /e\d{3}|emulgator|aroma|konservier/i.test(lower);
+      const isHealthyFat = /olivenöl|olive oil|kokosöl|coconut oil|kokosfett|butter|weidebutter|butterreinfett|ghee|rindertalg|tallow|kakaobutter|cocoa butter|avocadoöl/i.test(lower);
+      const isBadOil = !isHealthyFat && /raps|rapeseed|canola|sonnenblume|sunflower|palm|soja|soy|distel|safflower|maiskeim|corn oil|baumwollsaat|cottonseed|margarine|pflanzenöl|vegetable oil|pflanzenfett|frittier/i.test(lower);
+      const isBadSugar = /zucker|sugar|sucre|sirup|syrup|dextrose|fructose|maltodextrin/i.test(lower);
+      const isBadAdd = /\be\s?\d{3}[a-z]?\b|emulgator|emulsifier|lecithin|vanillin|aroma|flavour|flavor|konservier|preservative|carrageen|sucralose|aspartam/i.test(lower);
 
       let status = 'CLEAN';
       let explanation = 'Natürlicher Bestandteil, liefert Mikronährstoffe und zelluläre Bausteine.';
@@ -219,5 +316,7 @@ async function generateDeepScienceAnalysis(productName, ingredientsText, detecte
 
 module.exports = {
   fetchOpenFoodFacts,
+  calculateDistanceKm,
+  queryNearbyStores,
   generateDeepScienceAnalysis
 };

@@ -1,11 +1,14 @@
 /** @type {import('tailwindcss').Config} */
-export default {
+module.exports = {
   content: [
     "./index.html",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
   theme: {
     extend: {
+      screens: {
+        xs: '400px'
+      },
       colors: {
         discord: {
           dark: '#1e1f22',
@@ -22,4 +25,4 @@ export default {
     },
   },
   plugins: [],
-}
+};

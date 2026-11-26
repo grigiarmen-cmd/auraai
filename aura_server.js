@@ -1,5 +1,4 @@
 const express = require('express');
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const cors = require('cors');
 const { exec } = require('child_process');
 const https = require('https');
@@ -12,7 +11,7 @@ const { SEED_OILS, EMULSIFIERS_ADDITIVES, VERIFIED_FARMS } = require('./src/serv
 const { fetchOpenFoodFacts, calculateDistanceKm, queryNearbyStores, generateDeepScienceAnalysis } = require('./src/services/nutritionEngine');
 const { analyzeMedicalDiagnosis } = require('./src/services/medicalEngine');
 const { calculateDailyCalorieTarget } = require('./src/services/metabolicEngine');
-const { verificationStore, generateVerificationCode, sendVerificationEmail } = require('./src/services/authService');
+const { getCodeForWindow, verifyEmailCode, sendVerificationEmail } = require('./src/services/authService');
 const { searchFoodDatabase, calculateRemainingMacros, generateDailyMetabolicSummary } = require('./src/services/foodDatabase');
 const groqManager = require('./src/services/groqService');
 
@@ -267,15 +266,47 @@ async function getDailyBriefing() {
 
     // 3. Notion Produkte / ToDos
     let notionItems = [];
-    try {
-      notionItems = await new Promise((resolve) => {
-        getNotionProducts(DEFAULT_NOTION_DB_ID).then(items => {
-          resolve((items || []).slice(0, 4).map(i => i.name));
+    if (NOTION_TOKEN) {
+      try {
+        notionItems = await new Promise((resolve) => {
+          const payload = JSON.stringify({ page_size: 5 });
+          const nReq = https.request({
+            hostname: 'api.notion.com',
+            path: `/v1/databases/${DEFAULT_NOTION_DB_ID}/query`,
+            method: 'POST',
+            timeout: 4000,
+            headers: {
+              'Authorization': `Bearer ${NOTION_TOKEN}`,
+              'Notion-Version': '2022-06-28',
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(payload)
+            }
+          }, (nRes) => {
+            let b = '';
+            nRes.on('data', d => { b += d; });
+            nRes.on('end', () => {
+              try {
+                const j = JSON.parse(b);
+                const names = (j.results || []).map(p => {
+                  for (const k of Object.keys(p.properties || {})) {
+                    if (p.properties[k].type === 'title') return p.properties[k].title?.[0]?.plain_text;
+                  }
+                  return null;
+                }).filter(Boolean).slice(0, 4);
+                resolve(names);
+              } catch (e) { resolve([]); }
+            });
+          });
+          nReq.on('error', () => resolve([]));
+          nReq.on('timeout', () => { nReq.destroy(); resolve([]); });
+          nReq.write(payload);
+          nReq.end();
         });
-      });
-    } catch(e) {}
+      } catch(e) {}
+    }
 
-    const prompt = `Erstelle ein energiegeladenes, smartes und motivierendes "Daily Briefing" für den Nutzer für heute (Samstag, 21. November 2026).
+    const todayLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const prompt = `Erstelle ein energiegeladenes, smartes und motivierendes "Daily Briefing" für den Nutzer für heute (${todayLabel}).
 Standort: Jübek, Schleswig-Holstein.
 Wetter: ${weatherText}
 Anstehende Kalender-Termine: ${calendarEvents.length > 0 ? calendarEvents.join(', ') : 'Keine Termine für heute eingetragen'}
@@ -797,8 +828,14 @@ async function openApp(appName, query) {
   }
 }
 
-// API Chat Route
+// API Chat Route (delegates standard web/AI requests to unified api/chat handler; keeps Windows desktop commands local)
+const unifiedChatHandler = require('./api/chat');
 app.post('/api/chat', async (req, res) => {
+  const rawMsg = ((req.body && req.body.message) || '').trim();
+  const isWindowsCmd = /(?:^|\n)\s*(\/clean|\/mute|\/lock)\b/i.test(rawMsg) || /\b(open|starte|öffne)\s+(discord|spotify)\b/i.test(rawMsg);
+  if (!isWindowsCmd) {
+    return unifiedChatHandler(req, res);
+  }
   const { message, image, history, userNotionToken, userNotionDbId } = req.body;
   const activeNotionToken = userNotionToken || NOTION_TOKEN;
   const activeNotionDbId = userNotionDbId || DEFAULT_NOTION_DB_ID;
@@ -809,8 +846,9 @@ app.post('/api/chat', async (req, res) => {
       ? history.map(h => `${h.role === 'user' ? 'Nutzer' : 'Aura'}: "${h.text}"`).join('\n')
       : "Kein vorheriger Verlauf (neue Unterhaltung)";
 
+    const todayLabel = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const prompt = `Du bist 'Aura AI' – ein intelligenter, moderner Desktop-Begleiter.
-Heutiges Datum: Samstag, 21. November 2026.
+Heutiges Datum: ${todayLabel}.
 Aktueller Standort des Nutzers: ${userLocation.city}, ${userLocation.region}, ${userLocation.country}.
 
 BISHERIGER GESPRÄCHSVERLAUF (BEACHTE DIESEN KONTEXT UNBEDINGT!):
@@ -966,6 +1004,8 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
     let reply = (response && response.text) ? response.text : "Ich bin Aura AI. Wie kann ich dir helfen?";
     let actionExecuted = null;
     let generatedImageUrl = null;
+    let openUrl = null;
+    let playlistSong = null;
 
     if (reply.includes('[ACTION:GENERATE_IMAGE:')) {
       const match = reply.match(/\[ACTION:GENERATE_IMAGE:(.*?)\]/);
@@ -1069,8 +1109,6 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
       actionExecuted = results.join(' | ');
     }
 
-    let openUrl = null;
-
     if (reply.includes('[ACTION:SYSTEM_COMMAND:')) {
       const match = reply.match(/\[ACTION:SYSTEM_COMMAND:(.*?)\]/);
       if (match) {
@@ -1098,8 +1136,6 @@ Halte deine Antworten stilvoll, modern, prägnant und freundlich.`;
       reply = reply.replace('[ACTION:ORGANIZE_DOWNLOADS]', '').trim();
       if (!reply) reply = actionExecuted;
     }
-
-    let playlistSong = null;
 
     if (reply.includes('[ACTION:ADD_SONG_TO_PLAYLIST:')) {
       const match = reply.match(/\[ACTION:ADD_SONG_TO_PLAYLIST:(.*?)(?::(.*?))?\]/);
@@ -1431,69 +1467,26 @@ app.post('/api/metabolic/calculate', (req, res) => {
   }
 });
 
-// 6. Auth & Gmail Code Verification
-app.post('/api/auth/send-code', async (req, res) => {
-  try {
-    const { email } = req.body;
-    if (!email || !email.includes('@')) {
-      return res.status(400).json({ error: 'Gültige E-Mail erforderlich' });
-    }
+// 6. Unified Serverless-Compatible Routes for Local Dev & Electron Parity
+const vercelAuthHandler = require('./api/auth');
+const vercelLoginHandler = require('./api/login');
+const vercelRegisterHandler = require('./api/register');
+const vercelBarcodeHandler = require('./api/barcode');
+const vercelAnalyzeMealHandler = require('./api/analyze-meal');
 
-    const code = generateVerificationCode();
-    const expiresAt = Date.now() + 15 * 60 * 1000; // 15 Min
-
-    verificationStore.set(email.toLowerCase(), { code, expiresAt });
-    await sendVerificationEmail(email, code);
-
-    console.log(`✉️ Verifizierungscode an ${email} gesendet: ${code}`);
-    res.json({ success: true, message: 'Code erfolgreich gesendet' });
-  } catch (err) {
-    console.error("Send Code Error:", err);
-    res.status(500).json({ error: 'Fehler beim Senden des Codes via Gmail SMTP: ' + err.message });
-  }
-});
-
-app.post('/api/auth/verify-code', (req, res) => {
-  try {
-    const { email, code, profileData } = req.body;
-    const record = verificationStore.get((email || '').toLowerCase());
-
-    if (!record) {
-      return res.status(400).json({ error: 'Kein Code für diese E-Mail angefordert' });
-    }
-
-    if (Date.now() > record.expiresAt) {
-      verificationStore.delete(email.toLowerCase());
-      return res.status(400).json({ error: 'Code ist abgelaufen. Bitte neuen anfordern.' });
-    }
-
-    if (record.code !== code.trim()) {
-      return res.status(400).json({ error: 'Ungültiger 6-stelliger Code' });
-    }
-
-    // Success: Code verified
-    verificationStore.delete(email.toLowerCase());
-    console.log(`✅ Benutzer ${email} erfolgreich verifiziert!`);
-    
-    res.json({
-      success: true,
-      user: {
-        email,
-        verified: true,
-        profile: profileData || {}
-      }
-    });
-  } catch (err) {
-    console.error("Verify Code Error:", err);
-    res.status(500).json({ error: err.message });
-  }
-});
+app.all('/api/auth', (req, res) => vercelAuthHandler(req, res));
+app.all('/api/login', (req, res) => vercelLoginHandler(req, res));
+app.all('/api/auth/login', (req, res) => vercelLoginHandler(req, res));
+app.all('/api/register', (req, res) => vercelRegisterHandler(req, res));
+app.all('/api/auth/register', (req, res) => vercelRegisterHandler(req, res));
+app.all('/api/barcode', (req, res) => vercelBarcodeHandler(req, res));
+app.all('/api/analyze-meal', (req, res) => vercelAnalyzeMealHandler(req, res));
 
 // Yazio-Style Food Database & Calorie Tracker Routes
-app.get('/api/food/search', (req, res) => {
+app.get('/api/food/search', async (req, res) => {
   try {
     const q = req.query.q || '';
-    const results = searchFoodDatabase(q);
+    const results = await searchFoodDatabase(q);
     res.json({ success: true, count: results.length, foods: results });
   } catch (err) {
     console.error('Food search error:', err);

@@ -13,10 +13,17 @@ export default function CaffeineCircadianModal({ isOpen, onClose }) {
       const saved = localStorage.getItem(`aura_caffeine_${todayKey}`);
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return [
-      { id: '1', name: 'Doppelter Espresso', mg: 140, timestamp: Date.now() - 3.5 * 3600 * 1000, timeString: '09:30' }
-    ];
+    return [];
   });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
 
   const [customMg, setCustomMg] = useState(80);
   const [drinkName, setDrinkName] = useState('Kaffee');
@@ -157,7 +164,7 @@ export default function CaffeineCircadianModal({ isOpen, onClose }) {
                   <span className="text-base">{preset.icon}</span>
                   <span className="text-[10px] font-mono text-amber-400 font-bold">+{preset.mg}mg</span>
                 </div>
-                <span className="text-xs font-semibold text-zinc-200 block mt-1 group-hover:text-amber-300 truncate">
+                <span className="text-[11px] leading-tight font-semibold text-zinc-200 block mt-1 group-hover:text-amber-300">
                   {preset.name}
                 </span>
               </button>

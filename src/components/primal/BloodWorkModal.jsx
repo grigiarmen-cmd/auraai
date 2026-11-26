@@ -20,6 +20,15 @@ export default function BloodWorkModal({ isOpen, onClose }) {
 
   const fileInputRef = useRef(null);
 
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleFileUpload = (e) => {
@@ -84,27 +93,12 @@ Gib mir die Antwort als JSON im folgenden Format:
         }
       } catch(e) {}
 
-      // Fallback structured result if json parsing fails
-      const finalReport = parsedJson || {
-        doctorDate: new Date().toLocaleDateString('de-DE'),
-        summary: 'Blutbild erfolgreich erfasst. Mikronährstoffe und Entzündungsmarker bewertet.',
-        overallScore: 82,
-        markers: [
-          { name: 'hs-CRP (Entzündung)', value: '0.4 mg/l', status: 'OPTIMAL', optimalRange: '< 0.5 mg/l', orthodoxNorm: '< 5.0 mg/l', cellularNote: 'Geringe systemische Gefäß- & Gefäßendothel-Entzündung.' },
-          { name: 'Vitamin D3 (25-OH)', value: '64 ng/ml', status: 'OPTIMAL', optimalRange: '60 - 85 ng/ml', orthodoxNorm: '30 - 100 ng/ml', cellularNote: 'Perfekter Bereich für Immunzellen und Genexpression.' },
-          { name: 'Ferritin (Eisenspeicher)', value: '145 ng/ml', status: 'OPTIMAL', optimalRange: '100 - 180 ng/ml', orthodoxNorm: '30 - 400 ng/ml', cellularNote: 'Ideale Zellatmung ohne Fenton-Reaktions-Risiko.' },
-          { name: 'TSH (Schilddrüse)', value: '1.45 mU/l', status: 'OPTIMAL', optimalRange: '1.0 - 2.0 mU/l', orthodoxNorm: '0.4 - 4.0 mU/l', cellularNote: 'Stabile Stoffwechselrate & Mitochondrien-Aktivität.' },
-          { name: 'HOMA-Index (Insulin)', value: '1.1', status: 'OPTIMAL', optimalRange: '< 1.5', orthodoxNorm: '< 2.5', cellularNote: 'Hervorragende zelluläre Insulinsensitivität.' }
-        ],
-        actionSteps: [
-          'Aktuelle Vitamin D3 & K2 Dosierung beibehalten',
-          'Magnesium-Zufuhr weiterhin auf 400mg/Tag für ATP-Synthese halten',
-          'Omega-3 Index über Wildlachs oder Krillöl weiter hoch halten'
-        ]
-      };
+      if (!parsedJson || !Array.isArray(parsedJson.markers)) {
+        throw new Error('Die KI konnte keine strukturierten Laborwerte aus dem Bild auslesen. Bitte lade ein schärferes Foto hoch.');
+      }
 
-      setReportResult(finalReport);
-      localStorage.setItem('aura_latest_bloodwork', JSON.stringify(finalReport));
+      setReportResult(parsedJson);
+      localStorage.setItem('aura_latest_bloodwork', JSON.stringify(parsedJson));
     } catch(err) {
       console.error(err);
       setError('Fehler bei der OCR-Laboranalyse. Bitte stelle sicher, dass die Werte gut lesbar fotografiert wurden.');

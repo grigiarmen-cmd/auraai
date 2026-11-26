@@ -3,9 +3,9 @@ const nodemailer = require('nodemailer');
 
 require('dotenv').config();
 
-const GMAIL_USER = process.env.GMAIL_USER || 'grizzlygoegym@gmail.com';
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || 'fltv fkob ogai ynlt';
-const AUTH_SECRET = process.env.AUTH_SECRET || 'aura_super_secret_auth_token_key_2026';
+const GMAIL_USER = process.env.GMAIL_USER || '';
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || '';
+const AUTH_SECRET = process.env.AUTH_SECRET || process.env.NOTION_TOKEN || 'change_me_in_env';
 
 const transporter = nodemailer.createTransport({
   service: 'gmail',
@@ -14,6 +14,29 @@ const transporter = nodemailer.createTransport({
     pass: GMAIL_APP_PASSWORD.replace(/\s+/g, '')
   }
 });
+
+// Create a signed 30-day session token
+function createSessionToken(email) {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  const exp = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
+  const payload = Buffer.from(JSON.stringify({ email: cleanEmail, exp })).toString('base64url');
+  const sig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+  return `${payload}.${sig}`;
+}
+
+function verifySessionToken(token) {
+  try {
+    if (!token || !token.includes('.')) return null;
+    const [payload, sig] = token.split('.');
+    const expectedSig = crypto.createHmac('sha256', AUTH_SECRET).update(payload).digest('base64url');
+    if (sig !== expectedSig) return null;
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf-8'));
+    if (!data.email || !data.exp || Date.now() > data.exp) return null;
+    return data.email;
+  } catch (e) {
+    return null;
+  }
+}
 
 // Deterministic 6-digit code generation based on email and 15-minute time window
 function getCodeForWindow(email, windowOffset = 0) {
@@ -73,5 +96,7 @@ async function sendVerificationEmail(recipientEmail, code) {
 module.exports = {
   getCodeForWindow,
   verifyEmailCode,
-  sendVerificationEmail
+  sendVerificationEmail,
+  createSessionToken,
+  verifySessionToken
 };

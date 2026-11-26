@@ -4,6 +4,7 @@ import { Camera, X, Zap, AlertCircle, Maximize2 } from 'lucide-react';
 export default function InChatCameraScanner({ isOpen, onClose, onDetectedCode }) {
   const [error, setError] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
+  const [manualCode, setManualCode] = useState('');
   const scannerRef = useRef(null);
   const scanBufferRef = useRef({ lastCode: null, count: 0 });
 
@@ -113,6 +114,15 @@ export default function InChatCameraScanner({ isOpen, onClose, onDetectedCode })
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -164,9 +174,11 @@ export default function InChatCameraScanner({ isOpen, onClose, onDetectedCode })
           </div>
 
           {/* Center Hint Badge */}
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-[10px] text-zinc-300 pointer-events-none">
-            Auto-Fokus aktiv • EAN-13, EAN-8 & QR
-          </div>
+          {!error && isScanning && (
+            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md border border-white/10 text-[10px] text-zinc-300 pointer-events-none">
+              Auto-Fokus aktiv • EAN-13, EAN-8 & QR
+            </div>
+          )}
         </div>
 
         {error && (
@@ -176,6 +188,33 @@ export default function InChatCameraScanner({ isOpen, onClose, onDetectedCode })
           </div>
         )}
 
+        {/* Manual Barcode Input Fallback */}
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (manualCode.trim()) {
+              onDetectedCode(manualCode.trim());
+              setManualCode('');
+            }
+          }}
+          className="mt-3 w-full flex items-center gap-2"
+        >
+          <input
+            type="text"
+            value={manualCode}
+            onChange={(e) => setManualCode(e.target.value)}
+            placeholder="Oder Barcode manuell eingeben (z. B. 4008400404127)..."
+            className="flex-1 bg-zinc-900 border border-zinc-700 focus:border-cyan-500 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 outline-none"
+          />
+          <button
+            type="submit"
+            disabled={!manualCode.trim()}
+            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 text-black font-semibold text-xs transition-colors"
+          >
+            Prüfen
+          </button>
+        </form>
+
         {/* Footer info */}
         <div className="mt-3 w-full flex items-center justify-between text-[11px] text-zinc-400 px-1">
           <span className="flex items-center gap-1.5 text-zinc-300 font-medium">
@@ -184,7 +223,7 @@ export default function InChatCameraScanner({ isOpen, onClose, onDetectedCode })
           </span>
           <button
             onClick={onClose}
-            className="text-xs text-zinc-400 hover:text-white px-3 py-1 rounded-lg hover:bg-zinc-800 transition-colors"
+            className="text-xs text-zinc-200 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 px-3.5 py-1.5 rounded-lg transition-colors"
           >
             Schließen
           </button>

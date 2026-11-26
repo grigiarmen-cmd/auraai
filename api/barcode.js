@@ -46,7 +46,7 @@ function fetchFddbByBarcode(barcode) {
             if (carbM) carbs = parseFloat(carbM[1].replace(',', '.'));
           }
 
-          const protein = Math.round(((calories - (fat * 9) - (carbs * 4)) / 4) * 10) / 10 || 5;
+          const protein = Math.max(0, Math.round(((calories - (fat * 9) - (carbs * 4)) / 4) * 10) / 10);
 
           resolve({
             product_name: rawName,
@@ -103,7 +103,6 @@ NUR JSON zurückgeben.`
         hostname: "generativelanguage.googleapis.com",
         path: `/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`,
         method: "POST",
-        rejectUnauthorized: false,
         timeout: 5000,
         headers: {
           "Content-Type": "application/json",
@@ -215,8 +214,8 @@ module.exports = async (req, res) => {
       }
     });
 
-    const productName = product.product_name || product.product_name_de || 'Unbekanntes Produkt';
-    const ingredientsText = product.ingredients_text || 'Keine Zutatenliste verfügbar';
+    const productName = product.product_name_de || product.product_name || 'Unbekanntes Produkt';
+    const ingredientsText = product.ingredients_text_de || product.ingredients_text || 'Keine Zutatenliste verfügbar';
 
     // generateDeepScienceAnalysis(productName, ingredientsText, detectedToxins)
     const analysis = await generateDeepScienceAnalysis(productName, ingredientsText, detectedToxins);

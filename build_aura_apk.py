@@ -52,8 +52,8 @@ def build():
     # Remove existing script tags in head
     html = re.sub(r'<script[^>]*src="[^"]*"[^>]*></script>', '', html)
 
-    # Insert script right before </body>
-    script_bundle = f'<script defer>\ndocument.addEventListener("DOMContentLoaded", function() {{\n{js_content}\n}});\n</script>'
+    # Insert ES module script right before </body> so module syntax is 100% valid in Android WebView
+    script_bundle = f'<script type="module">\n{js_content}\n</script>'
     html = html.replace('</body>', f'{script_bundle}\n</body>')
 
     target_html = os.path.join(assets_dir, "index.html")
