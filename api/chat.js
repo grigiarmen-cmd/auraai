@@ -56,12 +56,15 @@ module.exports = async (req, res) => {
     const todayStr = new Date().toLocaleDateString('de-DE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
     const isoToday = new Date().toISOString().slice(0, 10);
 
-    // Strip any old [ACTION:...] tags from history so AI never re-triggers past actions!
+    // Strip any old [ACTION:...] tags or legacy canned error replies from history so AI never repeats them!
     const formattedHistory = (history && Array.isArray(history) && history.length > 0)
-      ? history.slice(-16).map(h => {
-          const safeText = (h.text || '').replace(/\[ACTION:.*?\]/g, '').trim();
-          return `${h.role === 'user' ? 'User' : 'Aura'}: ${safeText}`;
-        }).join('\n')
+      ? history
+          .filter(h => h && h.text && !/^(Hallo!\s*)?Ich bin Aura AI\.\s*Wie kann ich dir helfen\?$/i.test(h.text.trim()))
+          .slice(-16)
+          .map(h => {
+            const safeText = (h.text || '').replace(/\[ACTION:.*?\]/g, '').trim();
+            return `${h.role === 'user' ? 'User' : 'Aura'}: ${safeText}`;
+          }).join('\n')
       : 'Keine vorherigen Nachrichten.';
 
     // Pre-process explicit slash commands in user message
@@ -148,34 +151,40 @@ ${formattedHistory}`;
       const keyCount = Math.max(1, (geminiPool.keys || []).length);
       let geminiSuccess = false;
       const { GoogleGenAI } = require('@google/genai');
-      const geminiModel = requestedModel.startsWith('gemini-') ? requestedModel : 'gemini-2.5-flash-lite';
+      const primaryGeminiModel = requestedModel.startsWith('gemini-') ? requestedModel : 'gemini-2.5-flash-lite';
+      const geminiModelsToTry = [primaryGeminiModel, 'gemini-2.5-flash', 'gemini-2.0-flash'].filter((v, i, a) => a.indexOf(v) === i);
 
-      for (let attempt = 0; attempt < keyCount; attempt++) {
-        try {
-          const apiKey = geminiPool.getCurrentKey();
-          if (!apiKey) break;
-          const ai = new GoogleGenAI({ apiKey });
+      const parts = [{ text: effectiveUserPrompt }];
+      if (image && typeof image === 'string') {
+        const mimeMatch = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
+        const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+        const cleanBase64 = image.replace(/^data:[^;]+;base64,/, '');
+        parts.push({ inlineData: { mimeType, data: cleanBase64 } });
+      }
 
-          const parts = [{ text: effectiveUserPrompt }];
-          if (image && typeof image === 'string') {
-            const mimeMatch = image.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,/);
-            const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
-            const cleanBase64 = image.replace(/^data:[^;]+;base64,/, '');
-            parts.push({ inlineData: { mimeType, data: cleanBase64 } });
+      for (let attempt = 0; attempt < keyCount && !geminiSuccess; attempt++) {
+        const apiKey = geminiPool.getCurrentKey();
+        if (!apiKey) break;
+        const ai = new GoogleGenAI({ apiKey });
+
+        for (const gModel of geminiModelsToTry) {
+          try {
+            const genRes = await ai.models.generateContent({
+              model: gModel,
+              contents: [{ role: 'user', parts }],
+              config: { systemInstruction: systemPrompt }
+            });
+            rawReply = genRes.text || '';
+            if (rawReply) {
+              geminiSuccess = true;
+              break;
+            }
+          } catch (geminiErr) {
+            console.warn(`Gemini key #${attempt + 1} (${gModel}) failed:`, geminiErr.message);
           }
+        }
 
-          const genRes = await ai.models.generateContent({
-            model: geminiModel,
-            contents: [{ role: 'user', parts }],
-            config: { systemInstruction: systemPrompt }
-          });
-          rawReply = genRes.text || '';
-          if (rawReply) {
-            geminiSuccess = true;
-            break;
-          }
-        } catch (geminiErr) {
-          console.warn(`Gemini key #${attempt + 1} failed, rotating:`, geminiErr.message);
+        if (!geminiSuccess) {
           geminiPool.rotateKey();
         }
       }

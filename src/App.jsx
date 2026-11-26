@@ -628,7 +628,7 @@ export default function App() {
     if (!ghostText.trim()) return;
     setGhostLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/ghostwrite`, {
+      const res = await fetch(`${API_BASE}/api/tools?action=ghostwrite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: ghostText, mode })
@@ -652,7 +652,7 @@ export default function App() {
     reader.onload = async (e) => {
       const base64 = e.target.result;
       try {
-        const res = await fetch(`${API_BASE}/api/parse-document`, {
+        const res = await fetch(`${API_BASE}/api/tools?action=parse-document`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ fileName: file.name, fileBase64: base64 })
@@ -776,7 +776,7 @@ export default function App() {
 
   const fetchNotionPages = async () => {
     try {
-      const res = await fetch(`${API_BASE}/api/notion/pages`, { headers: getNotionHeaders() });
+      const res = await fetch(`${API_BASE}/api/notion?action=pages`, { headers: getNotionHeaders() });
       if (res.ok) {
         const data = await res.json();
         if (data.pages) setNotionPages(data.pages);
@@ -788,7 +788,7 @@ export default function App() {
     setLoadingNotion(true);
     const targetId = dbId || selectedPage.id;
     try {
-      const res = await fetch(`${API_BASE}/api/notion/products?dbId=${encodeURIComponent(targetId)}`, {
+      const res = await fetch(`${API_BASE}/api/notion?action=products&dbId=${encodeURIComponent(targetId)}`, {
         headers: getNotionHeaders()
       });
       if (res.ok) {

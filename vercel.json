@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/api/ghostwrite", "destination": "/api/tools?action=ghostwrite" },
+    { "source": "/api/parse-document", "destination": "/api/tools?action=parse-document" },
+    { "source": "/api/notion/pages", "destination": "/api/notion?action=pages" },
+    { "source": "/api/notion/products", "destination": "/api/notion?action=products" }
+  ]
+}

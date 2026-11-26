@@ -1473,6 +1473,8 @@ const vercelLoginHandler = require('./api/login');
 const vercelRegisterHandler = require('./api/register');
 const vercelBarcodeHandler = require('./api/barcode');
 const vercelAnalyzeMealHandler = require('./api/analyze-meal');
+const vercelToolsHandler = require('./api/tools');
+const vercelNotionHandler = require('./api/notion');
 
 app.all('/api/auth', (req, res) => vercelAuthHandler(req, res));
 app.all('/api/login', (req, res) => vercelLoginHandler(req, res));
@@ -1481,6 +1483,8 @@ app.all('/api/register', (req, res) => vercelRegisterHandler(req, res));
 app.all('/api/auth/register', (req, res) => vercelRegisterHandler(req, res));
 app.all('/api/barcode', (req, res) => vercelBarcodeHandler(req, res));
 app.all('/api/analyze-meal', (req, res) => vercelAnalyzeMealHandler(req, res));
+app.all('/api/tools', (req, res) => vercelToolsHandler(req, res));
+app.all('/api/notion', (req, res) => vercelNotionHandler(req, res));
 
 // Yazio-Style Food Database & Calorie Tracker Routes
 app.get('/api/food/search', async (req, res) => {
