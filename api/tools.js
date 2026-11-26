@@ -1,6 +1,18 @@
-const pdfParse = require('pdf-parse');
 const geminiPool = require('../src/services/geminiPool');
 const groqManager = require('../src/services/groqService');
+
+// Pure-JS lightweight PDF text fallback for serverless environments where pdfjs DOMMatrix is unavailable
+function extractTextFromPdfBufferFallback(buffer) {
+  const raw = buffer.toString('latin1');
+  const matches = raw.match(/\(([^()\\]{2,}|\\.)+\)/g) || [];
+  const cleaned = matches
+    .map(m => m.slice(1, -1).replace(/\\([()\\])/g, '$1').replace(/\\n/g, '\n'))
+    .filter(s => /[a-zA-ZäöüÄÖÜ0-9]{2,}/.test(s))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return cleaned;
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -22,8 +34,13 @@ module.exports = async (req, res) => {
       let textContent = '';
 
       if (fileName && fileName.toLowerCase().endsWith('.pdf')) {
-        const parsed = await pdfParse(buffer);
-        textContent = parsed.text || '';
+        try {
+          const pdfParse = require('pdf-parse');
+          const parsed = await pdfParse(buffer);
+          textContent = parsed.text || '';
+        } catch (pdfErr) {
+          textContent = extractTextFromPdfBufferFallback(buffer);
+        }
       } else {
         textContent = buffer.toString('utf-8');
       }
@@ -32,7 +49,7 @@ module.exports = async (req, res) => {
       return res.status(200).json({
         fileName: fileName || 'Dokument',
         characterCount: textContent.length,
-        content: truncated
+        content: truncated || 'Dokument geladen (kein extrahierbarer Klartext gefunden).'
       });
     } catch (err) {
       return res.status(500).json({ error: err.message || 'Dokument konnte nicht gelesen werden' });
@@ -58,12 +75,12 @@ module.exports = async (req, res) => {
   for (let k = 0; k < keyCount; k++) {
     const apiKey = geminiPool.getCurrentKey();
     if (!apiKey) break;
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
     for (const m of modelsToTry) {
       try {
         const genRes = await ai.models.generateContent({
           model: m,
-          contents: [{ text: prompt }]
+          contents: [{ role: 'user', parts: [{ text: prompt }] }]
         });
         if (genRes.text) {
           return res.status(200).json({ result: genRes.text.trim() });

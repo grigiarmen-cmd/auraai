@@ -63,7 +63,7 @@ Gib AUSSCHLIESSLICH das valide JSON ohne Markdown-Tags zurück.`;
     while (attempts < maxAttempts) {
       const apiKey = this.getCurrentKey();
       if (!apiKey) break;
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
 
       for (const modelName of modelsToTry) {
         try {

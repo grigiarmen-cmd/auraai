@@ -165,7 +165,7 @@ ${formattedHistory}`;
       for (let attempt = 0; attempt < keyCount && !geminiSuccess; attempt++) {
         const apiKey = geminiPool.getCurrentKey();
         if (!apiKey) break;
-        const ai = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey, apiVersion: 'v1beta' });
 
         for (const gModel of geminiModelsToTry) {
           try {
